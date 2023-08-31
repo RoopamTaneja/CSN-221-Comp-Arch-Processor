@@ -1,2 +1,3 @@
-kaise ho maja ma?
-hello how are khana khao
+addi a b c
+xor a k l
+auipc r2 89

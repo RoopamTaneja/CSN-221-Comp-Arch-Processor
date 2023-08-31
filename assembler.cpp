@@ -1,3 +1,4 @@
+#include "opcode.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -34,7 +35,8 @@ void newReadAndParse(string codeLine, string &label, string &opcode, string &arg
 }
 string encoder(string label, string opcode, string arg0, string arg1, string arg2)
 {
-    string encodedString = arg2 + arg1 + arg0 + opcode + label;
+    string opcode_enc = opcode_table[opcode];
+    string encodedString = opcode_enc;
     return encodedString;
 }
 int isNumber(char *string)
