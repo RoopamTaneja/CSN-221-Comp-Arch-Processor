@@ -23,4 +23,5 @@ store_n_print:
     lw a1, 0x00000004(zero)
     li a7, 64 # to print
     ecall
-    jr ra
+    li a0, 10
+    ecall

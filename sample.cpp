@@ -1,13 +1,23 @@
-bool f()
-{
-    int a = 15;
-    int b = 2;
-    while (b < a)
-    {
-        if (a % b == 0)
-            return false;
+#include <bits/stdc++.h>
+using namespace std;
+typedef long long ll;
+typedef vector<ll> vl;
+typedef vector<int> vi;
 
-        b++;
-    }
-    return true;
+void remcom(string &s)
+{
+    int size = s.size();
+    if (s.front() == ',')
+        s = s.substr(1, size - 1);
+    if (s.back() == ',')
+        s.pop_back();
+}
+
+int main()
+{
+    string s = "adsds";
+    remcom(s);
+    cout << s;
+
+    return 0;
 }

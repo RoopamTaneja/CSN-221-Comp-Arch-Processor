@@ -50,4 +50,5 @@ store_n_print_lcm:
     ecall
 
 exit:
-    jr ra
+    li a0, 10
+    ecall

@@ -5,14 +5,40 @@
 #include <sstream>
 using std::cout, std::cin, std::string;
 
+const string WHITESPACE = " \n\r\t\f\v";
+
+string ltrim(const string &s)
+{
+    int start = s.find_first_not_of(WHITESPACE);
+    return (start == std::string::npos) ? "" : s.substr(start);
+}
+
+string rtrim(const string &s)
+{
+    int end = s.find_last_not_of(WHITESPACE);
+    return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+}
+
+void remcom(string &s)
+{
+    int size = s.size();
+    if (s.front() == ',')
+        s = s.substr(1, size - 1);
+    if (s.back() == ',')
+        s.pop_back();
+}
+
 void newReadAndParse(string codeLine, string &label, string &opcode, string &arg0, string &arg1, string &arg2)
 {
     std::vector<string> tokens;
     std::stringstream ss(codeLine);
-    std::string token;
+    string token;
 
     while (getline(ss, token, ' ') && token[0] != '#')
+    {
+        remcom(token);
         tokens.push_back(token);
+    }
 
     if (tokens.empty() || tokens[0][0] == '#')
         return;
@@ -33,10 +59,14 @@ void newReadAndParse(string codeLine, string &label, string &opcode, string &arg
         tokens.size() >= 4 ? arg2 = tokens[3] : arg2 = "";
     }
 }
+
 string encoder(string label, string opcode, string arg0, string arg1, string arg2)
 {
     string opcode_enc = opcode_table[opcode];
-    string encodedString = opcode_enc;
+    string encodedString;
+    label != "" ? encodedString = label : encodedString = opcode_enc;
+    encodedString += (arg0 + arg1 + arg2);
+    // encodedString = opcode_enc + " " + label + " " + arg0 + " " + arg1 + " " + arg2;
     return encodedString;
 }
 int isNumber(char *string)
@@ -70,6 +100,7 @@ int main(int argc, char *argv[])
     while (inString.eof() == 0)
     {
         getline(inString, codeLine);
+        codeLine = rtrim(ltrim(codeLine)); // remove leading or trailing whitespaces
         string label = "", opcode = "", arg0 = "", arg1 = "", arg2 = "";
         newReadAndParse(codeLine, label, opcode, arg0, arg1, arg2);
         string encodedString = encoder(label, opcode, arg0, arg1, arg2);
