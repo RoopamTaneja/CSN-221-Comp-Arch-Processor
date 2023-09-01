@@ -22,15 +22,14 @@ std::unordered_map<std::string, std::string> opcode_table = {
     // i-type load
     {"lb", "0000011"},
     {"lw", "0000011"},
-    {"ld", "0000011"},
     // s-type
     {"sb", "0100011"},
     {"sw", "0100011"},
-    {"sd", "0100011"},
     // b-type
     {"beq", "1100011"},
     {"bne", "1100011"},
     {"blt", "1100011"},
+    {"bge", "1100011"},
     // jal
     {"jal", "1101111"},
     // jalr
@@ -39,5 +38,5 @@ std::unordered_map<std::string, std::string> opcode_table = {
     {"lui", "0110111"},
     // auipc
     {"auipc", "0010111"}
-    // 28 instructions to begin with
+    // 27 instructions to begin with
 };

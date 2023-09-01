@@ -1,12 +1,13 @@
-#include <bits/stdc++.h>
-using namespace std;
-typedef long long ll;
-typedef vector<ll> vl;
-typedef vector<int> vi;
-
-
-int main()
+bool f()
 {
-    
-    return 0;
+    int a = 15;
+    int b = 2;
+    while (b < a)
+    {
+        if (a % b == 0)
+            return false;
+
+        b++;
+    }
+    return true;
 }

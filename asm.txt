@@ -1,3 +1,0 @@
-addi a b c
-xor a k l
-auipc r2 89
