@@ -9,7 +9,6 @@ std::unordered_map<std::string, std::string> opcode_table = {
     {"or", "0110011"},
     {"and", "0110011"},
     {"sll", "0110011"},
-    {"srl", "0110011"},
     {"sra", "0110011"},
     // rem, mul and div
     {"rem", "0110011"},
@@ -21,17 +20,13 @@ std::unordered_map<std::string, std::string> opcode_table = {
     {"ori", "0010011"},
     {"andi", "0010011"},
     {"slli", "0010011"},
-    {"srli", "0010011"},
     {"srai", "0010011"},
     // i-type load
-    {"lb", "0000011"},
     {"lw", "0000011"},
     // s-type
-    {"sb", "0100011"},
     {"sw", "0100011"},
     // b-type
     {"beq", "1100011"},
-    {"bne", "1100011"},
     {"blt", "1100011"},
     // jal
     {"jal", "1101111"},
@@ -43,5 +38,5 @@ std::unordered_map<std::string, std::string> opcode_table = {
     {"auipc", "0010111"},
     // ecall
     {"ecall", "1110011"},
-    // 30 instructions to begin with
+    // 25 instructions to begin with
 };
