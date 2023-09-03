@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "sstream": "cpp",
         "any": "cpp",
         "array": "cpp",
         "atomic": "cpp",
@@ -76,7 +77,6 @@
         "semaphore": "cpp",
         "shared_mutex": "cpp",
         "span": "cpp",
-        "sstream": "cpp",
         "stdexcept": "cpp",
         "stop_token": "cpp",
         "streambuf": "cpp",

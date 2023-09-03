@@ -2,7 +2,7 @@
 #include <unordered_map>
 
 std::unordered_map<std::string, int> register_table{
-
+    // ABI name, index
     {"zero", 0},
     {"ra", 1},
     {"sp", 2},

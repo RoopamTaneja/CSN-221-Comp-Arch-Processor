@@ -1,0 +1,26 @@
+DONE
+References
+1prime.s
+2fac.s
+3gcd.s
+hex_dict.h
+opcode.h
+r_type.h
+i_type.h
+registers.h
+
+PENDING
+assembler.cpp
+pseudo.h
+README.md
+simulator.cpp
+Truth_Table.xlsx
+
+
+Testing files
+a.exe
+asm.txt
+bin.txt
+done.txt
+hex.txt
+sample.cpp
