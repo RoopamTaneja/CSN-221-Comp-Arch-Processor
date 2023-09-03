@@ -4,8 +4,7 @@ using std::cout, std::cin, std::string;
 
 int dec_sign_imm(string s)
 {
-    int dec_val = 0;
-    int base = 1;
+    int dec_val = 0, base = 1;
     bool neg = (s[0] == '1');
     if (neg)
     {

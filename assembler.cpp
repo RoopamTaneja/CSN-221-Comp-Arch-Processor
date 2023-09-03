@@ -2,7 +2,7 @@
 #include "opcode.h"
 #include "registers.h"
 #include "r_type.h"
-#include "i_type.h"
+#include "nf7_type.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -46,22 +46,32 @@ void readAndParse(string codeLine, string &label, string &opcode, string &arg0, 
 
     if (tokens.empty() || tokens[0][0] == '#')
         return;
-    if (tokens[0].back() == ':')
+    // if (tokens[0].back() == ':')
+    // {
+    //     tokens[0].pop_back();
+    //     label = tokens[0];
+    //     tokens.size() >= 2 ? opcode = tokens[1] : opcode = "";
+    //     tokens.size() >= 3 ? arg0 = tokens[2] : arg0 = "";
+    //     tokens.size() >= 4 ? arg1 = tokens[3] : arg1 = "";
+    //     tokens.size() >= 5 ? arg2 = tokens[4] : arg2 = "";
+    // }
+    // else
+    // {
+    opcode = tokens[0];
+    tokens.size() >= 2 ? arg0 = tokens[1] : arg0 = "";
+    tokens.size() >= 3 ? arg1 = tokens[2] : arg1 = "";
+    tokens.size() >= 4 ? arg2 = tokens[3] : arg2 = "";
+    if (arg1.back() == ')')
     {
-        tokens[0].pop_back();
-        label = tokens[0];
-        tokens.size() >= 2 ? opcode = tokens[1] : opcode = "";
-        tokens.size() >= 3 ? arg0 = tokens[2] : arg0 = "";
-        tokens.size() >= 4 ? arg1 = tokens[3] : arg1 = "";
-        tokens.size() >= 5 ? arg2 = tokens[4] : arg2 = "";
+        arg2 = arg1;
+        int cnt = 0, i = arg2.length() - 2;
+        while (arg2[i] != '(')
+            cnt++, i--;
+        arg1 = arg2.substr(i + 1, cnt);
+        arg2 = arg2.substr(0, i);
     }
-    else
-    {
-        opcode = tokens[0];
-        tokens.size() >= 2 ? arg0 = tokens[1] : arg0 = "";
-        tokens.size() >= 3 ? arg1 = tokens[2] : arg1 = "";
-        tokens.size() >= 4 ? arg2 = tokens[3] : arg2 = "";
-    }
+
+    // }
 }
 
 string binary_enc(int n, int len)
@@ -118,18 +128,76 @@ string r_enc(string opcode, string arg0, string arg1, string arg2)
 string i_enc(string opcode, string arg0, string arg1, string arg2)
 {
     string imm12, rs1, f3, rd, opcode_enc;
-    imm12 = bin_sign_imm(stoi(arg2), 12);
+    // assuming shamt entered is from 0-31 and since prefix decided = 7 zeroes, nothing special needs to be done
+    if (arg2[1] == 'x')
+        imm12 = bin_sign_imm(stoi(arg2, 0, 16), 12);
+    else
+        imm12 = bin_sign_imm(stoi(arg2), 12);
     rs1 = binary_enc(register_table[arg1], 5);
-    f3 = binary_enc(i_table[opcode], 3);
+    f3 = binary_enc(nf7_table[opcode], 3);
     rd = binary_enc(register_table[arg0], 5);
     opcode_enc = opcode_table[opcode].first;
     return imm12 + rs1 + f3 + rd + opcode_enc;
-    // work on slli, srai, shamt , encoding
 }
-// string s_enc(string opcode, string arg0, string arg1, string arg2) {}
-// string b_enc(string opcode, string arg0, string arg1, string arg2) {}
-// string j_enc(string opcode, string arg0, string arg1, string arg2) {}
-// string u_enc(string opcode, string arg0, string arg1, string arg2) {}
+
+string s_enc(string opcode, string arg0, string arg1, string arg2)
+{
+    string imm12, imm1, imm2, rs2, rs1, f3, opcode_enc;
+    if (arg2[1] == 'x')
+        imm12 = bin_sign_imm(stoi(arg2, 0, 16), 12);
+    else
+        imm12 = bin_sign_imm(stoi(arg2), 12);
+    imm1 = imm12.substr(0, 7);
+    imm2 = imm12.substr(7, 5);
+    rs2 = binary_enc(register_table[arg0], 5);
+    rs1 = binary_enc(register_table[arg1], 5);
+    f3 = binary_enc(nf7_table[opcode], 3);
+    opcode_enc = opcode_table[opcode].first;
+    return imm1 + rs2 + rs1 + f3 + imm2 + opcode_enc;
+}
+
+string b_enc(string opcode, string arg0, string arg1, string arg2)
+{
+    string imm12, imm1, imm2, rs2, rs1, f3, opcode_enc;
+    if (arg2[1] == 'x')
+        imm12 = bin_sign_imm(stoi(arg2, 0, 16), 13);
+    else
+        imm12 = bin_sign_imm(stoi(arg2), 13);
+    imm12.pop_back();
+    imm1 = imm12[0] + imm12.substr(2, 6);
+    imm2 = imm12.substr(8, 4) + imm12[1];
+    rs2 = binary_enc(register_table[arg1], 5);
+    rs1 = binary_enc(register_table[arg0], 5);
+    f3 = binary_enc(nf7_table[opcode], 3);
+    opcode_enc = opcode_table[opcode].first;
+    return imm1 + rs2 + rs1 + f3 + imm2 + opcode_enc;
+}
+
+string j_enc(string opcode, string arg0, string arg1)
+{
+    string imm20, imm, rd, opcode_enc;
+    if (arg1[1] == 'x')
+        imm20 = bin_sign_imm(stoi(arg1, 0, 16), 21);
+    else
+        imm20 = bin_sign_imm(stoi(arg1), 21);
+    imm20.pop_back();
+    imm = imm20[0] + imm20.substr(10, 10) + imm20[9] + imm20.substr(1, 8);
+    rd = binary_enc(register_table[arg0], 5);
+    opcode_enc = opcode_table[opcode].first;
+    return imm + rd + opcode_enc;
+}
+
+string u_enc(string opcode, string arg0, string arg1)
+{
+    string imm20, rd, opcode_enc;
+    if (arg1[1] == 'x')
+        imm20 = bin_sign_imm(stoi(arg1, 0, 16), 20);
+    else
+        imm20 = bin_sign_imm(stoi(arg1), 20);
+    rd = binary_enc(register_table[arg0], 5);
+    opcode_enc = opcode_table[opcode].first;
+    return imm20 + rd + opcode_enc;
+}
 
 string encoder(string label, string opcode, string arg0, string arg1, string arg2, bool choice)
 {
@@ -146,21 +214,21 @@ string encoder(string label, string opcode, string arg0, string arg1, string arg
         encodedString = i_enc(opcode, arg0, arg1, arg2);
         break;
 
-        // case 's':
-        //     encodedString = s_enc(opcode_enc, arg0, arg1, arg2);
-        //     break;
+    case 's':
+        encodedString = s_enc(opcode, arg0, arg1, arg2);
+        break;
 
-        // case 'b':
-        //     encodedString = b_enc(opcode_enc, arg0, arg1, arg2);
-        //     break;
+    case 'b':
+        encodedString = b_enc(opcode, arg0, arg1, arg2);
+        break;
 
-        // case 'j':
-        //     encodedString = j_enc(opcode_enc, arg0, arg1, arg2);
-        //     break;
+    case 'j':
+        encodedString = j_enc(opcode, arg0, arg1);
+        break;
 
-        // case 'u':
-        //     encodedString = u_enc(opcode_enc, arg0, arg1, arg2);
-        //     break;
+    case 'u':
+        encodedString = u_enc(opcode, arg0, arg1);
+        break;
 
     default:
         encodedString = "Incorrect opcode";

@@ -33,8 +33,7 @@ string bin_sign_imm(int n, int len)
 
 int dec_sign_imm(string s)
 {
-    int dec_val = 0;
-    int base = 1;
+    int dec_val = 0, base = 1;
     bool neg = (s[0] == '1');
     if (neg)
     {
@@ -54,9 +53,55 @@ int dec_sign_imm(string s)
     return dec_val;
 }
 
+void readAndParse(string codeLine)
+{
+    string label, opcode, arg0, arg1, arg2;
+    std::vector<string> tokens;
+    std::stringstream ss(codeLine);
+    string token;
+
+    while (getline(ss, token, ' ') && token[0] != '#')
+    {
+        tokens.push_back(token);
+    }
+
+    if (tokens.empty() || tokens[0][0] == '#')
+        return;
+    // if (tokens[0].back() == ':')
+    // {
+    //     tokens[0].pop_back();
+    //     label = tokens[0];
+    //     tokens.size() >= 2 ? opcode = tokens[1] : opcode = "";
+    //     tokens.size() >= 3 ? arg0 = tokens[2] : arg0 = "";
+    //     tokens.size() >= 4 ? arg1 = tokens[3] : arg1 = "";
+    //     tokens.size() >= 5 ? arg2 = tokens[4] : arg2 = "";
+    // }
+    // else
+    // {
+    opcode = tokens[0];
+    tokens.size() >= 2 ? arg0 = tokens[1] : arg0 = "";
+    tokens.size() >= 3 ? arg1 = tokens[2] : arg1 = "";
+    tokens.size() >= 4 ? arg2 = tokens[3] : arg2 = "";
+    if (arg1.back() == ')')
+    {
+        arg2 = arg1;
+        int cnt = 0, i = arg2.length() - 2;
+        while (arg2[i] != '(')
+            cnt++, i--;
+        arg1 = arg2.substr(i + 1, cnt);
+        arg2 = arg2.substr(0, i);
+        cout << opcode << " " << arg1 << " " << arg2;
+    }
+
+    // }
+}
+
 int main()
 {
-    cout << bin_sign_imm(8192, 12) << "\n";
-    cout << dec_sign_imm(bin_sign_imm(8192, 12));
+    string s = "lw a1, 0x00000004(zero)";
+    readAndParse(s);
+    // cout << bin_sign_imm(8192, 12) << "\n";
+    // cout << bin_sign_imm(-7, 12) << "\n";
+    // cout << dec_sign_imm(bin_sign_imm(8192, 12));
     return 0;
 }
