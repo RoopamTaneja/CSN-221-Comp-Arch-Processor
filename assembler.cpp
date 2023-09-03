@@ -1,12 +1,15 @@
+#include "hex_dict.h"
 #include "opcode.h"
+#include "registers.h"
+#include "r_type.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 #include <sstream>
 using std::cout, std::cin, std::string;
 
 const string WHITESPACE = " \n\r\t\f\v";
-
 string ltrim(const string &s)
 {
     int start = s.find_first_not_of(WHITESPACE);
@@ -60,30 +63,105 @@ void newReadAndParse(string codeLine, string &label, string &opcode, string &arg
     }
 }
 
-string encoder(string label, string opcode, string arg0, string arg1, string arg2)
+string binary_enc(int n, int len)
 {
-    string opcode_enc = opcode_table[opcode];
+    string binary;
+    for (int i = 0; n != 0; i++)
+    {
+        binary.push_back(n % 2 + '0');
+        n = n / 2;
+    }
+    while (binary.length() < len)
+        binary.push_back('0');
+    reverse(binary.begin(), binary.end());
+    return binary;
+}
+
+string b32toHex(string bin)
+{
+    string hex;
+    bin = string(bin.length() % 4 ? 4 - bin.length() % 4 : 0, '0') + bin;
+    for (int i = 0; i < bin.length(); i += 4)
+    {
+        string group = bin.substr(i, 4);
+        hex += hex_dict[group];
+    }
+    return hex;
+}
+
+string r_enc(string opcode, string opcode_enc, string arg0, string arg1, string arg2)
+{
+    string f7, rs2, rs1, f3, rd;
+    f7 = binary_enc(r_table[opcode].first, 7);
+    rs2 = binary_enc(register_table[arg2], 5);
+    rs1 = binary_enc(register_table[arg1], 5);
+    f3 = binary_enc(r_table[opcode].second, 3);
+    rd = binary_enc(register_table[arg0], 5);
+    return f7 + rs2 + rs1 + f3 + rd + opcode_enc;
+}
+
+string i_enc(string opcode, string arg0, string arg1, string arg2) {}
+string s_enc(string opcode, string arg0, string arg1, string arg2) {}
+string b_enc(string opcode, string arg0, string arg1, string arg2) {}
+string j_enc(string opcode, string arg0, string arg1, string arg2) {}
+string u_enc(string opcode, string arg0, string arg1, string arg2) {}
+
+string encoder(string label, string opcode, string arg0, string arg1, string arg2, bool choice)
+{
+    string opcode_enc = opcode_table[opcode].first;
+    char type = opcode_table[opcode].second;
     string encodedString;
-    label != "" ? encodedString = label : encodedString = opcode_enc;
-    encodedString += (arg0 + arg1 + arg2);
-    // encodedString = opcode_enc + " " + label + " " + arg0 + " " + arg1 + " " + arg2;
+    // label != "" ? encodedString = label : encodedString = opcode_enc;
+    switch (type)
+    {
+    case 'r':
+        encodedString = r_enc(opcode, opcode_enc, arg0, arg1, arg2);
+        break;
+
+    case 'i':
+        encodedString = i_enc(opcode_enc, arg0, arg1, arg2);
+        break;
+
+    case 's':
+        encodedString = s_enc(opcode_enc, arg0, arg1, arg2);
+        break;
+
+    case 'b':
+        encodedString = b_enc(opcode_enc, arg0, arg1, arg2);
+        break;
+
+    case 'j':
+        encodedString = j_enc(opcode_enc, arg0, arg1, arg2);
+        break;
+
+    case 'u':
+        encodedString = u_enc(opcode_enc, arg0, arg1, arg2);
+        break;
+
+    default:
+        encodedString = "Incorrect opcode";
+        break;
+    }
+    if (choice == 1 && encodedString != "Incorrect opcode")
+        encodedString = b32toHex(encodedString);
     return encodedString;
 }
-int isNumber(char *string)
-{
-    /* return 1 if string is a number */
-    int i;
-    return ((sscanf(string, "%d", &i)) == 1);
-}
+// int isNumber(char *string)
+// {
+//     /* return 1 if string is a number */
+//     int i;
+//     return ((sscanf(string, "%d", &i)) == 1);
+// }
 int main(int argc, char *argv[])
 {
-    if (argc != 3)
+    if (argc != 4)
     {
         cout << "Incorrect Format\n";
         return 0;
     }
     string inFileString = argv[1];
-    string outFileString = argv[2];
+    string outBinString = argv[2];
+    string outHexString = argv[3];
     string codeLine;
     std::ifstream inString(inFileString);
     if (inString.bad())
@@ -91,10 +169,16 @@ int main(int argc, char *argv[])
         cout << "Error in opening : " << inFileString << "\n";
         return 0;
     }
-    std::ofstream outString(outFileString, std::ios::app);
-    if (outString.bad())
+    std::ofstream outBString(outBinString, std::ios::app);
+    std::ofstream outHString(outHexString, std::ios::app);
+    if (outBString.bad())
     {
-        cout << "Error in opening : " << outFileString << "\n";
+        cout << "Error in opening : " << outBinString << "\n";
+        return 0;
+    }
+    if (outHString.bad())
+    {
+        cout << "Error in opening : " << outHexString << "\n";
         return 0;
     }
     while (inString.eof() == 0)
@@ -103,10 +187,13 @@ int main(int argc, char *argv[])
         codeLine = rtrim(ltrim(codeLine)); // remove leading or trailing whitespaces
         string label = "", opcode = "", arg0 = "", arg1 = "", arg2 = "";
         newReadAndParse(codeLine, label, opcode, arg0, arg1, arg2);
-        string encodedString = encoder(label, opcode, arg0, arg1, arg2);
-        outString << encodedString << "\n";
+        string encodedBString = encoder(label, opcode, arg0, arg1, arg2, 0);
+        string encodedHString = encoder(label, opcode, arg0, arg1, arg2, 1);
+        outBString << encodedBString << "\n";
+        outHString << encodedHString << "\n";
     }
-    outString.close();
+    outBString.close();
+    outHString.close();
     inString.close();
     return 0;
 }
