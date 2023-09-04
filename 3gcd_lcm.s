@@ -1,8 +1,6 @@
-.globl gcd_lcm
-
 # Finds gcd and lcm of two non-zero positive nos
 gcd_lcm:
-    li a4, 81
+    li a4, 27
     li a5, 45
     sw a4, 0x00000000(zero)
     sw a5, 0x00000004(zero)
@@ -14,7 +12,7 @@ load_val:
 find_min: # a6 = min(a4,a5)
     blt a4, a5, load_other
     addi a6, a5, 0
-    j loop_gcd
+    jal zero, loop_gcd
 
 load_other:
     addi a6, a4, 0
@@ -27,7 +25,7 @@ loop_gcd:
     or a2, a0, a1 # a0 or a1 == 0 only iff both rem == 0
     beq a2, zero, store_n_print_gcd # in that case it's our gcd
     addi a6,a6,-1 # a6--
-    j loop_gcd
+    jal zero, loop_gcd
 
 store_n_print_gcd:
     sw a6, 0x00000008(zero)

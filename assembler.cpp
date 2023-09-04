@@ -34,17 +34,20 @@ void remcom(string &s)
 
 void readAndParse(string codeLine, string &label, string &opcode, string &arg0, string &arg1, string &arg2)
 {
+    codeLine = rtrim(ltrim(codeLine)); // remove leading or trailing whitespaces
     std::vector<string> tokens;
     std::stringstream ss(codeLine);
     string token;
 
-    while (getline(ss, token, ' ') && token[0] != '#')
+    while (getline(ss, token, ' '))
     {
         remcom(token);
+        if (token[0] == '#')
+            break;
         tokens.push_back(token);
     }
 
-    if (tokens.empty() || tokens[0][0] == '#')
+    if (tokens.empty())
         return;
     // if (tokens[0].back() == ':')
     // {
@@ -74,10 +77,10 @@ void readAndParse(string codeLine, string &label, string &opcode, string &arg0, 
     // }
 }
 
-string binary_enc(int n, int len)
+string binary_enc(long long n, int len)
 {
     string binary;
-    for (int i = 0; n != 0; i++)
+    while (n != 0)
     {
         binary.push_back(n % 2 + '0');
         n = n / 2;
@@ -89,13 +92,13 @@ string binary_enc(int n, int len)
     return binary;
 }
 
-string bin_sign_imm(int n, int len)
+string bin_sign_imm(long long n, int len)
 {
     string imm = binary_enc(abs(n), len);
     if (n < 0)
     {
-        int k = imm.find_last_of('1');
-        for (int i = k - 1; i >= 0; i--)
+        long long k = imm.find_last_of('1');
+        for (long long i = k - 1; i >= 0; i--)
             imm[i] == '0' ? imm[i] = '1' : imm[i] = '0';
     }
     return imm;
@@ -130,9 +133,9 @@ string i_enc(string opcode, string arg0, string arg1, string arg2)
     string imm12, rs1, f3, rd, opcode_enc;
     // assuming shamt entered is from 0-31 and since prefix decided = 7 zeroes, nothing special needs to be done
     if (arg2[1] == 'x')
-        imm12 = bin_sign_imm(stoi(arg2, 0, 16), 12);
+        imm12 = bin_sign_imm(stoll(arg2, NULL, 16), 12);
     else
-        imm12 = bin_sign_imm(stoi(arg2), 12);
+        imm12 = bin_sign_imm(stoll(arg2), 12);
     rs1 = binary_enc(register_table[arg1], 5);
     f3 = binary_enc(nf7_table[opcode], 3);
     rd = binary_enc(register_table[arg0], 5);
@@ -144,9 +147,9 @@ string s_enc(string opcode, string arg0, string arg1, string arg2)
 {
     string imm12, imm1, imm2, rs2, rs1, f3, opcode_enc;
     if (arg2[1] == 'x')
-        imm12 = bin_sign_imm(stoi(arg2, 0, 16), 12);
+        imm12 = bin_sign_imm(stoll(arg2, NULL, 16), 12);
     else
-        imm12 = bin_sign_imm(stoi(arg2), 12);
+        imm12 = bin_sign_imm(stoll(arg2), 12);
     imm1 = imm12.substr(0, 7);
     imm2 = imm12.substr(7, 5);
     rs2 = binary_enc(register_table[arg0], 5);
@@ -160,9 +163,9 @@ string b_enc(string opcode, string arg0, string arg1, string arg2)
 {
     string imm12, imm1, imm2, rs2, rs1, f3, opcode_enc;
     if (arg2[1] == 'x')
-        imm12 = bin_sign_imm(stoi(arg2, 0, 16), 13);
+        imm12 = bin_sign_imm(stoll(arg2, NULL, 16), 13);
     else
-        imm12 = bin_sign_imm(stoi(arg2), 13);
+        imm12 = bin_sign_imm(stoll(arg2), 13);
     imm12.pop_back();
     imm1 = imm12[0] + imm12.substr(2, 6);
     imm2 = imm12.substr(8, 4) + imm12[1];
@@ -177,9 +180,9 @@ string j_enc(string opcode, string arg0, string arg1)
 {
     string imm20, imm, rd, opcode_enc;
     if (arg1[1] == 'x')
-        imm20 = bin_sign_imm(stoi(arg1, 0, 16), 21);
+        imm20 = bin_sign_imm(stoll(arg1, NULL, 16), 21);
     else
-        imm20 = bin_sign_imm(stoi(arg1), 21);
+        imm20 = bin_sign_imm(stoll(arg1), 21);
     imm20.pop_back();
     imm = imm20[0] + imm20.substr(10, 10) + imm20[9] + imm20.substr(1, 8);
     rd = binary_enc(register_table[arg0], 5);
@@ -191,12 +194,36 @@ string u_enc(string opcode, string arg0, string arg1)
 {
     string imm20, rd, opcode_enc;
     if (arg1[1] == 'x')
-        imm20 = bin_sign_imm(stoi(arg1, 0, 16), 20);
+        imm20 = bin_sign_imm(stoll(arg1, NULL, 16), 20);
     else
-        imm20 = bin_sign_imm(stoi(arg1), 20);
+        imm20 = bin_sign_imm(stoll(arg1), 20);
     rd = binary_enc(register_table[arg0], 5);
     opcode_enc = opcode_table[opcode].first;
     return imm20 + rd + opcode_enc;
+}
+
+string li_enc(string arg0, string arg1)
+{
+    string instr1, instr2;
+    long long imm1, imm2;
+    if (arg1[1] == 'x')
+        imm1 = stoll(arg1, NULL, 16);
+    else
+        imm1 = stoll(arg1);
+    imm2 = (imm1 + 0x800) >> 12;
+    arg1 = std::to_string(imm2);
+    instr1 = u_enc("lui", arg0, arg1);
+    arg1 = std::to_string(imm1 & 0xfff);
+    instr2 = i_enc("addi", arg0, arg0, arg1);
+    return instr1 + "\n" + instr2;
+}
+
+string p_enc(string opcode, string arg0, string arg1, string arg2)
+{
+    string opcode_enc = opcode_table[opcode].first;
+    if (opcode_enc == "xxxxxxx")
+        return li_enc(arg0, arg1);
+    return "";
 }
 
 string encoder(string label, string opcode, string arg0, string arg1, string arg2, bool choice)
@@ -228,6 +255,10 @@ string encoder(string label, string opcode, string arg0, string arg1, string arg
 
     case 'u':
         encodedString = u_enc(opcode, arg0, arg1);
+        break;
+
+    case 'p':
+        encodedString = p_enc(opcode, arg0, arg1, arg2);
         break;
 
     default:
@@ -269,12 +300,25 @@ int main(int argc, char *argv[])
     while (inString.eof() == 0)
     {
         getline(inString, codeLine);
-        codeLine = rtrim(ltrim(codeLine)); // remove leading or trailing whitespaces
         string label = "", opcode = "", arg0 = "", arg1 = "", arg2 = "";
         readAndParse(codeLine, label, opcode, arg0, arg1, arg2);
         string encodedBString = encoder(label, opcode, arg0, arg1, arg2, 0);
         string encodedHString;
-        encodedBString == "Incorrect opcode" ? encodedHString = encodedBString : encodedHString = "0x" + binToHex(encodedBString);
+        if (encodedBString == "Incorrect opcode")
+            encodedHString = encodedBString;
+        else if (encodedBString.find('\n') != string::npos)
+        {
+            std::vector<string> tokens;
+            std::stringstream ss(encodedBString);
+            string token;
+            while (getline(ss, token, '\n'))
+                tokens.push_back(token);
+            for (int i = 0; i < tokens.size() - 1; i++)
+                encodedHString = "0x" + binToHex(tokens[i]) + "\n";
+            encodedHString += "0x" + binToHex(tokens.back());
+        }
+        else
+            encodedHString = "0x" + binToHex(encodedBString);
         outBString << encodedBString << "\n";
         outHString << encodedHString << "\n";
     }

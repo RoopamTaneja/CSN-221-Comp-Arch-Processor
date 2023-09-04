@@ -1,5 +1,3 @@
-.globl prime # Make program starting address to linker globally visible
-
 # Checks if a given positive no is prime or not
 prime:
     li a5, 103 # Value to be checked
@@ -11,18 +9,18 @@ load_val:
 
 loop:
     blt a4, a5, divide_check 
-    j true
+    jal zero, true
 
 divide_check:
     rem a6, a5, a4
     beq a6, zero, false # rem == 0 => not prime
     addi a4, a4, 1 # else check for next divisor
-    j loop
+    jal zero, loop
 
 false:
     li a0, 0 # not prime
     sw a0, 0x00000004(zero)
-    j print_result
+    jal zero, print_result
 
 true:
     li a0, 1 # prime

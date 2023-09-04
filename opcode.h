@@ -36,7 +36,7 @@ std::unordered_map<std::string, std::pair<std::string, char>> opcode_table = {
     {"lui", {"0110111", 'u'}},
     // auipc
     {"auipc", {"0010111", 'u'}},
-    // ecall
-    {"ecall", {"1110011", 'i'}},
+    // pseudo
+    {"li", {"xxxxxxx", 'p'}},
     // 25 instructions to begin with
 };

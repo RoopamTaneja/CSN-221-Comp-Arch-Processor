@@ -1,0 +1,17 @@
+main:
+# lui a1, 0xDEADBEEF
+lui a2, 0x12345
+addi a2, a2, 0x678
+li a2, 0x12345678
+lui a1, 0x7FFFF
+addi a1, a1, 0xFFF
+li a1, 0x7FFFFFFF
+
+
+lui a2, 0xABCDE
+addi a2, a2, 0xFFF
+
+li a2, 0xABCDEFFF
+
+lui a3, 0xABCDF
+addi a3, a3, 0xFFF

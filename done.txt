@@ -1,17 +1,16 @@
 DONE
-References
 1prime.s
 2fac.s
 3gcd.s
 hex_dict.h
 opcode.h
 r_type.h
-i_type.h
+nf7_type.h
 registers.h
 
 PENDING
+References
 assembler.cpp
-pseudo.h
 README.md
 simulator.cpp
 Truth_Table.xlsx
@@ -24,3 +23,5 @@ bin.txt
 done.txt
 hex.txt
 sample.cpp
+save.txt
+test.s

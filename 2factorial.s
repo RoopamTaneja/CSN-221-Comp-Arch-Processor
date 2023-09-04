@@ -1,5 +1,3 @@
-.globl factorial
-
 # Finds factorial of a (not very large) positive no
 factorial:
     li a4, 12 # Value whose factorial needs to be found
@@ -14,7 +12,7 @@ loop:
     blt a4, a6, store_n_print
     mul a5, a5, a4
     addi a4,a4,-1
-    j loop
+    jal zero, loop
 
 store_n_print:
     sw a5, 0x00000004(zero) # storing result
