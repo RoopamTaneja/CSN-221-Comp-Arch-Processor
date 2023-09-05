@@ -1,0 +1,17 @@
+# Checks if a given positive no is prime or not
+prime:
+    li a5, 103 # Value to be checked
+    sw a5, 0x00000000(zero)
+
+load_val:
+    lw a5, 0x00000000(zero)
+    li a4, 2
+
+
+divide_check:
+    rem a6, a5, a4
+    addi a4, a4, 1 # else check for next divisor
+
+false:
+    li a0, 0 # not prime
+    sw a0, 0x00000004(zero)

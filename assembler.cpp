@@ -11,6 +11,8 @@
 #include <sstream>
 using std::cout, std::cin, std::string;
 
+int currLineAddr = -4;
+
 const string WHITESPACE = " \n\r\t\f\v";
 string ltrim(const string &s)
 {
@@ -89,6 +91,10 @@ void parseInstr(string codeLine, string &opcode, string &arg0, string &arg1, str
         arg1 = arg2.substr(i + 1, cnt);
         arg2 = arg2.substr(0, i);
     }
+    if (opcode == "li") // be careful for li
+        currLineAddr += 8;
+    else
+        currLineAddr += 4;
 }
 
 string binary_enc(long long n, int len)
@@ -334,21 +340,25 @@ int main(int argc, char *argv[])
         string encodedHString;
         if (encodedBString == "Incorrect opcode")
             encodedHString = encodedBString;
-        else if (encodedBString.find('\n') != string::npos)
+        else if (opcode == "li")
         {
             std::vector<string> tokens;
             std::stringstream ss(encodedBString);
             string token;
             while (getline(ss, token, '\n'))
                 tokens.push_back(token);
-            for (int i = 0; i < tokens.size() - 1; i++)
-                encodedHString = "0x" + binToHex(tokens[i]) + "\n";
-            encodedHString += "0x" + binToHex(tokens.back());
+            encodedBString = std::to_string(currLineAddr - 4) + ": " + tokens[0] + "\n";
+            encodedBString += std::to_string(currLineAddr) + ": " + tokens[1];
+            encodedHString = std::to_string(currLineAddr - 4) + ": " + "0x" + binToHex(tokens[0]) + "\n";
+            encodedHString += std::to_string(currLineAddr) + ": " + "0x" + binToHex(tokens[1]);
+            outBString << encodedBString << "\n";
+            outHString << encodedHString << "\n";
+            continue;
         }
         else
             encodedHString = "0x" + binToHex(encodedBString);
-        outBString << encodedBString << "\n";
-        outHString << encodedHString << "\n";
+        outBString << currLineAddr << ": " + encodedBString << "\n";
+        outHString << currLineAddr << ": " + encodedHString << "\n";
     }
     outBString.close();
     outHString.close();
