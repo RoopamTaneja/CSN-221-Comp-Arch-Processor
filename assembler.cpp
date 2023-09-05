@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <map>
 #include <algorithm>
 #include <sstream>
 using std::cout, std::cin, std::string;
@@ -19,6 +20,8 @@ string ltrim(const string &s)
 
 string rtrim(const string &s)
 {
+    if (s == "")
+        return s;
     int end = s.find_last_not_of(WHITESPACE);
     return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
@@ -32,34 +35,47 @@ void remcom(string &s)
         s.pop_back();
 }
 
-void readAndParse(string codeLine, string &label, string &opcode, string &arg0, string &arg1, string &arg2)
+std::map<string, int> parseLabels(string inFileString)
 {
-    codeLine = rtrim(ltrim(codeLine)); // remove leading or trailing whitespaces
+    string codeLine;
+    std::ifstream inLabels(inFileString);
+    int addr = 0;
+    std::map<string, int> labelAddr;
+    while (inLabels.eof() == 0)
+    {
+        getline(inLabels, codeLine);
+        codeLine = rtrim(ltrim(codeLine));
+        if (codeLine == "")
+            continue;
+        std::stringstream ss(codeLine);
+        string token;
+        getline(ss, token, ' ');
+        remcom(token);
+        if (token.front() == '#')
+            continue;
+        else if (token.back() == ':')
+            labelAddr[token] = addr;
+        else if (token == "li") // be careful for li
+            addr += 8;
+        else
+            addr += 4;
+    }
+    inLabels.close();
+    return labelAddr;
+}
+
+void parseInstr(string codeLine, string &opcode, string &arg0, string &arg1, string &arg2)
+{
     std::vector<string> tokens;
     std::stringstream ss(codeLine);
     string token;
-
     while (getline(ss, token, ' '))
     {
         remcom(token);
-        if (token[0] == '#')
+        if (token.front() == '#')
             break;
         tokens.push_back(token);
     }
-
-    if (tokens.empty())
-        return;
-    // if (tokens[0].back() == ':')
-    // {
-    //     tokens[0].pop_back();
-    //     label = tokens[0];
-    //     tokens.size() >= 2 ? opcode = tokens[1] : opcode = "";
-    //     tokens.size() >= 3 ? arg0 = tokens[2] : arg0 = "";
-    //     tokens.size() >= 4 ? arg1 = tokens[3] : arg1 = "";
-    //     tokens.size() >= 5 ? arg2 = tokens[4] : arg2 = "";
-    // }
-    // else
-    // {
     opcode = tokens[0];
     tokens.size() >= 2 ? arg0 = tokens[1] : arg0 = "";
     tokens.size() >= 3 ? arg1 = tokens[2] : arg1 = "";
@@ -68,13 +84,11 @@ void readAndParse(string codeLine, string &label, string &opcode, string &arg0, 
     {
         arg2 = arg1;
         int cnt = 0, i = arg2.length() - 2;
-        while (arg2[i] != '(')
+        while (arg2[i] != '(') // handling bracket arguments
             cnt++, i--;
         arg1 = arg2.substr(i + 1, cnt);
         arg2 = arg2.substr(0, i);
     }
-
-    // }
 }
 
 string binary_enc(long long n, int len)
@@ -131,7 +145,8 @@ string r_enc(string opcode, string arg0, string arg1, string arg2)
 string i_enc(string opcode, string arg0, string arg1, string arg2)
 {
     string imm12, rs1, f3, rd, opcode_enc;
-    // assuming shamt entered is from 0-31 and since prefix decided = 7 zeroes, nothing special needs to be done
+    // assuming shamt entered is from 0-31 and since prefix decided = 7 zeroes,
+    // nothing special needs to be done
     if (arg2[1] == 'x')
         imm12 = bin_sign_imm(stoll(arg2, NULL, 16), 12);
     else
@@ -226,11 +241,10 @@ string p_enc(string opcode, string arg0, string arg1, string arg2)
     return "";
 }
 
-string encoder(string label, string opcode, string arg0, string arg1, string arg2, bool choice)
+string encoder(string opcode, string arg0, string arg1, string arg2)
 {
     char type = opcode_table[opcode].second;
     string encodedString;
-    // label != "" ? encodedString = label : encodedString = opcode_enc;
     switch (type)
     {
     case 'r':
@@ -297,12 +311,26 @@ int main(int argc, char *argv[])
         cout << "Error in opening : " << outHexString << "\n";
         return 0;
     }
+    std::map<string, int> labelAddr = parseLabels(inFileString);
+    // for (auto &it : labelAddr)
+    // {
+    //     cout << it.first << " " << it.second << "\n";
+    // }
     while (inString.eof() == 0)
     {
         getline(inString, codeLine);
-        string label = "", opcode = "", arg0 = "", arg1 = "", arg2 = "";
-        readAndParse(codeLine, label, opcode, arg0, arg1, arg2);
-        string encodedBString = encoder(label, opcode, arg0, arg1, arg2, 0);
+        codeLine = rtrim(ltrim(codeLine)); // remove leading or trailing whitespaces
+        if (codeLine == "")
+            continue; // to handle blank lines
+        std::stringstream ss(codeLine);
+        string token;
+        getline(ss, token, ' ');
+        remcom(token);
+        if (token.front() == '#' || token.back() == ':')
+            continue;
+        string opcode = "", arg0 = "", arg1 = "", arg2 = "";
+        parseInstr(codeLine, opcode, arg0, arg1, arg2);
+        string encodedBString = encoder(opcode, arg0, arg1, arg2);
         string encodedHString;
         if (encodedBString == "Incorrect opcode")
             encodedHString = encodedBString;

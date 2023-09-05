@@ -11,7 +11,7 @@ public:
     bool memRead, memWrite, mem2Reg;
     string branch, jump;
 
-    void setImmGen_n_ALUop(string op5)//done
+    void setImmGen_n_ALUop(string op5) // done
     {
         if (op5 == "01100")
             immGen = "000", ALUop = "00";
@@ -29,7 +29,7 @@ public:
             immGen = "101", ALUop = "10";
     }
 
-    Controller(string op5, string f3, char f7)
+    Controller(string op5, string f3)
     {
         if (op5 == "11011" || op5 == "11001" || op5 == "00101")
             op1Sel = 1;
@@ -42,6 +42,43 @@ public:
             op2Sel = 1;
 
         setImmGen_n_ALUop(op5);
+
+        if (op5 == "11011" || op5 == "01101" || op5 == "00101")
+            regRead = 0;
+        else
+            regRead = 1;
+
+        if (op5 == "01000" || op5 == "11000")
+            regWrite = 0;
+        else
+            regWrite = 1;
+
+        if (op5 == "00000")
+            memRead = 1, mem2Reg = 1;
+        else
+            memRead = 0, mem2Reg = 0;
+
+        if (op5 == "01000")
+            memWrite = 1;
+        else
+            memWrite = 0;
+
+        if (op5 == "11000")
+        {
+            if (f3 == "000")
+                branch = "01";
+            else if (f3 == "100")
+                branch = "10";
+        }
+        else
+            branch = "00";
+
+        if (op5 == "11011")
+            jump = "01";
+        else if (op5 == "11001")
+            jump = "10";
+        else
+            jump = "00";
     }
 
     void checkCtrlWord()
@@ -75,8 +112,9 @@ int dec_sign_imm(string s)
 
 int main()
 {
-    string instr;
-    Controller ControlWord(instr.substr(25, 5), instr.substr(17, 3), instr[6]);
-
+    string instr = "00000011000001111110010110110011";
+    Controller ControlWord(instr.substr(25, 5), instr.substr(17, 3));
+    ControlWord.checkCtrlWord();
+    // instr[6]
     return 0;
 }
