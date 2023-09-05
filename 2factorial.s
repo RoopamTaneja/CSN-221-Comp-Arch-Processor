@@ -11,13 +11,13 @@ load_val:
 loop:
     blt a4, a6, store_n_print
     mul a5, a5, a4
-    addi a4,a4,-1
+    addi a4, a4, -1
     jal zero, loop
 
 store_n_print:
     sw a5, 0x00000004(zero) # storing result
     # printing result
-    li a0,1
+    li a0, 1
     lw a1, 0x00000004(zero)
     li a7, 64 # to print
     ecall

@@ -24,7 +24,7 @@ loop_gcd:
     rem a1, a5, a6 # a1 = a4%a6
     or a2, a0, a1 # a0 or a1 == 0 only iff both rem == 0
     beq a2, zero, store_n_print_gcd # in that case it's our gcd
-    addi a6,a6,-1 # a6--
+    addi a6, a6, -1 # a6--
     jal zero, loop_gcd
 
 store_n_print_gcd:
@@ -42,7 +42,7 @@ lcm:
 
 store_n_print_lcm:
     sw a7, 0x0000000C(zero)
-    li a0,1
+    li a0, 1
     lw a1, 0x0000000C(zero)
     li a7, 64
     ecall

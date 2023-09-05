@@ -7,10 +7,10 @@ opcode.h
 r_type.h
 nf7_type.h
 registers.h
+assembler.cpp
 
 PENDING
 References
-assembler.cpp
 README.md
 simulator.cpp
 Truth_Table.xlsx

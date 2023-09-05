@@ -28,7 +28,7 @@ true:
 
 print_result:
     # syscall code goes into a7
-    li a0,1 # 1 = stdout
+    li a0, 1 # 1 = stdout
     lw a1, 0x00000004(zero)
     li a7, 64 # to print
     ecall

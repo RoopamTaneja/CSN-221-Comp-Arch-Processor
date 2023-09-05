@@ -332,10 +332,8 @@ int main(int argc, char *argv[])
         return 0;
     }
     std::map<string, int> labelAddr = parseLabels(inFileString);
-    // for (auto &it : labelAddr)
-    // {
+    // for (auto &it : labelAddr) // debugging
     //     cout << it.first << " " << it.second << "\n";
-    // }
     while (inString.eof() == 0)
     {
         getline(inString, codeLine);
@@ -361,8 +359,6 @@ int main(int argc, char *argv[])
             string token;
             while (getline(ss, token, '\n'))
                 tokens.push_back(token);
-            encodedBString = std::to_string(currLineAddr - 4) + ": " + tokens[0] + "\n";
-            encodedBString += std::to_string(currLineAddr) + ": " + tokens[1];
             encodedHString = std::to_string(currLineAddr - 4) + ": " + "0x" + binToHex(tokens[0]) + "\n";
             encodedHString += std::to_string(currLineAddr) + ": " + "0x" + binToHex(tokens[1]);
             outBString << encodedBString << "\n";
@@ -371,7 +367,7 @@ int main(int argc, char *argv[])
         }
         else
             encodedHString = "0x" + binToHex(encodedBString);
-        outBString << currLineAddr << ": " + encodedBString << "\n";
+        outBString << encodedBString << "\n";
         outHString << currLineAddr << ": " + encodedHString << "\n";
     }
     outBString.close();
