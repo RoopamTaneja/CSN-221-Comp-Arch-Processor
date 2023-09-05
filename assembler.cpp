@@ -5,6 +5,7 @@
 #include "nf7_type.h"
 #include <iostream>
 #include <fstream>
+#include <cctype>
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -56,7 +57,10 @@ std::map<string, int> parseLabels(string inFileString)
         if (token.front() == '#')
             continue;
         else if (token.back() == ':')
+        {
+            token.pop_back();
             labelAddr[token] = addr;
+        }
         else if (token == "li") // be careful for li
             addr += 8;
         else
@@ -180,12 +184,17 @@ string s_enc(string opcode, string arg0, string arg1, string arg2)
     return imm1 + rs2 + rs1 + f3 + imm2 + opcode_enc;
 }
 
-string b_enc(string opcode, string arg0, string arg1, string arg2)
+string b_enc(string opcode, string arg0, string arg1, string arg2, std::map<string, int> labelAddr)
 {
     string imm12, imm1, imm2, rs2, rs1, f3, opcode_enc;
-    if (arg2[1] == 'x')
+    if (!isdigit(arg2[0])) // it is label
+    {
+        int offset = labelAddr[arg2] - currLineAddr;
+        imm12 = bin_sign_imm(offset, 13);
+    }
+    else if (arg2[1] == 'x') // it is hex
         imm12 = bin_sign_imm(stoll(arg2, NULL, 16), 13);
-    else
+    else // it is decimal
         imm12 = bin_sign_imm(stoll(arg2), 13);
     imm12.pop_back();
     imm1 = imm12[0] + imm12.substr(2, 6);
@@ -197,10 +206,15 @@ string b_enc(string opcode, string arg0, string arg1, string arg2)
     return imm1 + rs2 + rs1 + f3 + imm2 + opcode_enc;
 }
 
-string j_enc(string opcode, string arg0, string arg1)
+string j_enc(string opcode, string arg0, string arg1, std::map<string, int> labelAddr)
 {
     string imm20, imm, rd, opcode_enc;
-    if (arg1[1] == 'x')
+    if (!isdigit(arg1[0])) // it is label
+    {
+        int offset = labelAddr[arg1] - currLineAddr;
+        imm20 = bin_sign_imm(offset, 21);
+    }
+    else if (arg1[1] == 'x')
         imm20 = bin_sign_imm(stoll(arg1, NULL, 16), 21);
     else
         imm20 = bin_sign_imm(stoll(arg1), 21);
@@ -247,7 +261,7 @@ string p_enc(string opcode, string arg0, string arg1, string arg2)
     return "";
 }
 
-string encoder(string opcode, string arg0, string arg1, string arg2)
+string encoder(string opcode, string arg0, string arg1, string arg2, std::map<string, int> labelAddr)
 {
     char type = opcode_table[opcode].second;
     string encodedString;
@@ -266,11 +280,11 @@ string encoder(string opcode, string arg0, string arg1, string arg2)
         break;
 
     case 'b':
-        encodedString = b_enc(opcode, arg0, arg1, arg2);
+        encodedString = b_enc(opcode, arg0, arg1, arg2, labelAddr);
         break;
 
     case 'j':
-        encodedString = j_enc(opcode, arg0, arg1);
+        encodedString = j_enc(opcode, arg0, arg1, labelAddr);
         break;
 
     case 'u':
@@ -336,7 +350,7 @@ int main(int argc, char *argv[])
             continue;
         string opcode = "", arg0 = "", arg1 = "", arg2 = "";
         parseInstr(codeLine, opcode, arg0, arg1, arg2);
-        string encodedBString = encoder(opcode, arg0, arg1, arg2);
+        string encodedBString = encoder(opcode, arg0, arg1, arg2, labelAddr);
         string encodedHString;
         if (encodedBString == "Incorrect opcode")
             encodedHString = encodedBString;
