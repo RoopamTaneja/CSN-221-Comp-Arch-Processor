@@ -98,12 +98,18 @@ void readAndParse(string codeLine)
 
 int main()
 {
-    long long ans = stoll("0xDEADBEEF", 0, 16);
-    cout << ans;
+    // long long ans = stoll("0xDEADBEEF", 0, 16);
+    // cout << ans;
+    // int a = INT32_MAX;
+    // a += 10;
+    // cout << a << "\n";
     // string s = "lw a1, 0x00000004(zero)";
     // readAndParse(s);
     // cout << bin_sign_imm(8192, 12) << "\n";
     // cout << bin_sign_imm(-7, 12) << "\n";
     // cout << dec_sign_imm(bin_sign_imm(8192, 12));
+    // int ans = stoi("111111111011", NULL, 2);
+    int ans  = dec_sign_imm("111111111011");
+    cout << ans << "\n";
     return 0;
 }

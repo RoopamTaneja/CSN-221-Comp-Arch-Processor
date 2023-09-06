@@ -3,6 +3,8 @@
 https://gitlab.com/luplab/rvcodecjs -- repo
 https://luplab.gitlab.io/rvcodecjs/ -- link
 
+ONLY RV32I + M ext + li pseudo
+(No floating points)
 
 types of lines in asm : 
 1) blank lines
