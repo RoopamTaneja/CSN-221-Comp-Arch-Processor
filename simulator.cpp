@@ -1,4 +1,8 @@
 #include <iostream>
+#include <iomanip>
+#include <vector>
+#include <fstream>
+#include <sstream>
 using std::cout, std::cin, std::string;
 
 int dec_sign_imm(string s)
@@ -32,7 +36,7 @@ public:
     bool memRead, memWrite, mem2Reg;
     string branch, jump;
 
-    void setimmSel_n_ALUop(string op5)
+    void setImmSel_n_ALUop(string op5)
     {
         if (op5 == "01100")
             immSel = "000", ALUop = "00";
@@ -41,7 +45,7 @@ public:
         else if (op5 == "00000" || op5 == "11001")
             immSel = "001", ALUop = "10";
         else if (op5 == "01000")
-            immSel = "010";
+            immSel = "010", ALUop = "10";
         else if (op5 == "11000")
             immSel = "011", ALUop = "11";
         else if (op5 == "11011")
@@ -62,7 +66,7 @@ public:
         else
             op2Sel = 1;
 
-        setimmSel_n_ALUop(op5);
+        setImmSel_n_ALUop(op5);
 
         if (op5 == "11011" || op5 == "01101" || op5 == "00101")
             regRead = 0;
@@ -221,16 +225,113 @@ public:
     }
 };
 
-int main()
+int main(int argc, char *argv[])
 {
-    string instr = "00011100110101011000010001100011";
-    Controller CW(instr.substr(25, 5), instr.substr(17, 3));
-    string ALUsel = ALUcontrol(CW.ALUop, instr.substr(17, 3), instr[6]);
-    int imm = immGen(instr, CW.immSel);
-    CW.checkCtrlWord();
-    cout << ALUsel << "\n";
-    cout << imm << "\n";
-    // int rs1, rs2;
-    // ALU aluRes(ALUsel, rs1, rs2);
+    if (argc != 3)
+    {
+        cout << "Incorrect Format\n";
+        return 0;
+    }
+    string instrFile = argv[1];
+    string dataFile = argv[2];
+    string instrLine, dataLine;
+    // Loading the data into program DM
+    std::vector<int> DM;
+    std::ifstream inData(dataFile);
+    if (inData.bad())
+    {
+        cout << "Error in opening : " << dataFile << "\n";
+        return 0;
+    }
+    while (getline(inData, dataLine))
+    {
+        std::vector<string> tokens;
+        std::stringstream ss(dataLine);
+        string token;
+        while (getline(ss, token, ' '))
+            tokens.push_back(token);
+
+        DM.push_back(stoi(tokens[1]));
+    }
+    inData.close();
+    // Loading the instr into program IM
+    std::vector<string> IM;
+    std::ifstream inInstr(instrFile);
+    if (inInstr.bad())
+    {
+        cout << "Error in opening : " << instrFile << "\n";
+        return 0;
+    }
+    while (getline(inInstr, instrLine))
+        IM.push_back(instrLine);
+
+    inInstr.close();
+    int numInstr = IM.size();
+    std::vector<int> regFile(32, 0);
+
+    // Executing the instr
+    int PC = 0;
+    while (PC != numInstr * 4)
+    {
+        string instr = IM[PC / 4];
+        int NPC = PC + 4;
+        int TPC;
+        string op5 = instr.substr(25, 5);
+        string f3 = instr.substr(17, 3);
+        char f7 = instr[6];
+        int rsl1 = stoi(instr.substr(12, 5));
+        int rsl2 = stoi(instr.substr(7, 5));
+        int rdl = stoi(instr.substr(20, 5));
+        Controller CW(op5, f3);
+        int imm = immGen(instr, CW.immSel);
+        int rs1 = 0, rs2 = 0;
+        if (CW.regRead)
+            rs1 = regFile[rsl1];
+        if (CW.op2Sel)
+            rs2 = imm;
+        else
+            rs2 = regFile[rsl2];
+        string ALUsel = ALUcontrol(op5, f3, f7);
+        ALU aluRes(ALUsel, rs1, rs2);
+        int LDres;
+        if (CW.memWrite && CW.regRead)
+        {
+            rs2 = regFile[rsl2];
+            DM[aluRes.ALUresult / 4] = rs2;
+        }
+        if (CW.memRead)
+            LDres = DM[aluRes.ALUresult / 4];
+        // branch and jump stuff
+        // int JPC = PC + imm;
+        int BPC = PC + imm;
+        if ((CW.branch == "01" && aluRes.zeroFlag) || CW.branch == "10" && aluRes.LTflag)
+            TPC = BPC;
+        else
+            TPC = NPC;
+        if (CW.jump != "00")
+            TPC = aluRes.ALUresult;
+        if (CW.regWrite)
+        {
+            if (CW.mem2Reg)
+                regFile[rdl] = LDres;
+            else
+                regFile[rdl] = aluRes.ALUresult;
+        }
+        PC = TPC;
+    }
+    // Printing back the data from DM
+    std::ofstream outData(dataFile, std::ios::trunc);
+    if (outData.bad())
+    {
+        cout << "Error in opening : " << dataFile << "\n";
+        return 0;
+    }
+    int addr = 0;
+    for (auto &d : DM)
+    {
+        outData << "0x" << std::setw(4) << std::setfill('0') << std::uppercase << std::hex << addr << ": " << std::dec << d << "\n";
+        addr += 4;
+    }
+    outData.close();
     return 0;
 }
