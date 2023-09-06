@@ -336,6 +336,8 @@ int main(int argc, char *argv[])
         }
         regFile[0] = 0;
     }
+    // for (auto &i : regFile)
+    //     cout << i << "\n";
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())

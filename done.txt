@@ -8,12 +8,13 @@ r_type.h
 nf7_type.h
 registers.h
 assembler.cpp
+createEmptyDataFiles.cpp
+Truth_Table.xlsx
 
 PENDING
 References
 README.md
 simulator.cpp
-Truth_Table.xlsx
 
 
 Testing files
@@ -25,3 +26,5 @@ hex.txt
 sample.cpp
 save.txt
 test.s
+data.txt
+new.cpp

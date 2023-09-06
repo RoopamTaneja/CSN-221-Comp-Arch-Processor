@@ -1,3 +1,0 @@
-lw a0, 0x0000(zero)
-lw a1, 0x0004(zero)
-lw a2, 0x0008(zero)
