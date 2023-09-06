@@ -31,3 +31,5 @@ in data file : don't have any blank lines in start, middle or end (V.IMP), or an
 READS and Writes only decimal values (as of now) from and to Data Memory
 
 your memory addr in instr should be range : 0x00 to (i mean it's quite customisable so)
+
+## Sign extension is pending!!

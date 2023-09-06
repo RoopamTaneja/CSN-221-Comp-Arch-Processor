@@ -148,12 +148,94 @@ int immGen(const string instr, string immSel)
     return imm;
 }
 
+string ALUcontrol(string ALUop, string f3, char f7)
+{
+    if (ALUop == "10")
+        return "0000";
+    if (ALUop == "11")
+        return "0001";
+    if (ALUop == "00") // r-type
+    {
+        if (f3 == "000" && f7 == '0')
+            return "0000";
+        if (f3 == "010" && f7 == '0')
+            return "0001";
+        if (f3 == "100" && f7 == '0')
+            return "0101";
+        if (f3 == "110" && f7 == '0')
+            return "0110";
+        if (f3 == "111" && f7 == '0')
+            return "0111";
+        if (f3 == "001" && f7 == '0')
+            return "1000";
+        if (f3 == "101" && f7 == '0')
+            return "1001";
+        if (f3 == "110" && f7 == '1')
+            return "0100";
+        if (f3 == "000" && f7 == '1')
+            return "0010";
+        if (f3 == "100" && f7 == '1')
+            return "0011";
+    }
+    // i-type
+    if (f3 == "000")
+        return "0000";
+    if (f3 == "100")
+        return "0101";
+    if (f3 == "110")
+        return "0110";
+    if (f3 == "111")
+        return "0111";
+    if (f3 == "001")
+        return "1000";
+    return "1001";
+}
+
+class ALU
+{
+public:
+    int ALUresult;
+    bool zeroFlag;
+    bool LTflag;
+    ALU(string ALUsel, int rs1, int rs2)
+    {
+        if (ALUsel == "0000")
+            ALUresult = rs1 + rs2;
+        else if (ALUsel == "0001")
+            ALUresult = rs1 - rs2;
+        else if (ALUsel == "0010")
+            ALUresult = rs1 * rs2;
+        else if (ALUsel == "0011")
+            ALUresult = rs1 / rs2;
+        else if (ALUsel == "0100")
+            ALUresult = rs1 % rs2;
+        else if (ALUsel == "0101")
+            ALUresult = rs1 ^ rs2;
+        else if (ALUsel == "0110")
+            ALUresult = rs1 | rs2;
+        else if (ALUsel == "0111")
+            ALUresult = rs1 & rs2;
+        else if (ALUsel == "1000")
+            ALUresult = rs1 << rs2;
+        else if (ALUsel == "1001")
+            ALUresult = rs1 >> rs2;
+
+        zeroFlag = (ALUresult == 0);
+        LTflag = (ALUresult < 0);
+    }
+};
+
 int main(int argc, char *argv[])
 {
-    string instr = "00000000101100000010000000100011";
+    string instr = "00000000000000000010010100000011";
     string op5 = instr.substr(25, 5);
     string f3 = instr.substr(17, 3);
     char f7 = instr[6];
     Controller CW(op5, f3);
+    CW.checkCtrlWord();
+    cout << ALUcontrol(CW.ALUop, f3, f7) << "\n";
+    int rs1 = 4, rs2 = 5;
+    ALU alures(ALUcontrol(CW.ALUop, f3, f7), rs1, rs2);
+    cout << alures.ALUresult << "\n";
     return 0;
 }

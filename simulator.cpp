@@ -280,9 +280,9 @@ int main(int argc, char *argv[])
         string op5 = instr.substr(25, 5);
         string f3 = instr.substr(17, 3);
         char f7 = instr[6];
-        int rsl1 = stoi(instr.substr(12, 5));
-        int rsl2 = stoi(instr.substr(7, 5));
-        int rdl = stoi(instr.substr(20, 5));
+        int rsl1 = stoi(instr.substr(12, 5), NULL, 2);
+        int rsl2 = stoi(instr.substr(7, 5), NULL, 2);
+        int rdl = stoi(instr.substr(20, 5), NULL, 2);
         Controller CW(op5, f3);
         int imm = immGen(instr, CW.immSel);
         int rs1 = 0, rs2 = 0;
@@ -299,7 +299,7 @@ int main(int argc, char *argv[])
             rs2 = imm;
         else if (CW.jump != "00")
             rs2 = 4;
-        string ALUsel = ALUcontrol(op5, f3, f7);
+        string ALUsel = ALUcontrol(CW.ALUop, f3, f7);
         ALU aluRes(ALUsel, rs1, rs2);
 
         int JPC;
@@ -336,10 +336,6 @@ int main(int argc, char *argv[])
         }
         regFile[0] = 0;
     }
-    // for (auto &i : regFile)
-    // {
-    //     cout << i << "\n";
-    // }
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())
