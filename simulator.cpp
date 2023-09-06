@@ -273,9 +273,10 @@ int main(int argc, char *argv[])
     int PC = 0;
     while (PC != numInstr * 4)
     {
+        // stage 1
         string instr = IM[PC / 4];
-        int NPC = PC + 4;
-        int TPC;
+
+        // stage 2
         string op5 = instr.substr(25, 5);
         string f3 = instr.substr(17, 3);
         char f7 = instr[6];
@@ -286,13 +287,36 @@ int main(int argc, char *argv[])
         int imm = immGen(instr, CW.immSel);
         int rs1 = 0, rs2 = 0;
         if (CW.regRead)
+        {
             rs1 = regFile[rsl1];
+            rs2 = regFile[rsl2];
+        }
+
+        // stage 3
+        if (CW.op1Sel)
+            rs1 = PC;
         if (CW.op2Sel)
             rs2 = imm;
-        else
-            rs2 = regFile[rsl2];
+        else if (CW.jump != "00")
+            rs2 = 4;
         string ALUsel = ALUcontrol(op5, f3, f7);
         ALU aluRes(ALUsel, rs1, rs2);
+
+        int JPC;
+        if (CW.jump == "01") // jal
+            JPC = PC + imm;
+        else if (CW.jump == "10") // jalr
+            JPC = rs1 + imm;
+
+        int BPC = PC + imm;
+        if (CW.jump != "00")
+            PC = JPC;
+        else if ((CW.branch == "01" && aluRes.zeroFlag) || CW.branch == "10" && aluRes.LTflag)
+            PC = BPC;
+        else
+            PC = PC + 4;
+
+        // stage 4
         int LDres;
         if (CW.memWrite && CW.regRead)
         {
@@ -301,15 +325,8 @@ int main(int argc, char *argv[])
         }
         if (CW.memRead)
             LDres = DM[aluRes.ALUresult / 4];
-        // branch and jump stuff
-        // int JPC = PC + imm;
-        int BPC = PC + imm;
-        if ((CW.branch == "01" && aluRes.zeroFlag) || CW.branch == "10" && aluRes.LTflag)
-            TPC = BPC;
-        else
-            TPC = NPC;
-        if (CW.jump != "00")
-            TPC = aluRes.ALUresult;
+
+        // stage 5
         if (CW.regWrite)
         {
             if (CW.mem2Reg)
@@ -317,8 +334,12 @@ int main(int argc, char *argv[])
             else
                 regFile[rdl] = aluRes.ALUresult;
         }
-        PC = TPC;
+        regFile[0] = 0;
     }
+    // for (auto &i : regFile)
+    // {
+    //     cout << i << "\n";
+    // }
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())
