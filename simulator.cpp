@@ -61,7 +61,7 @@ public:
         else
             op1Sel = 0;
 
-        if (op5 == "01100")
+        if (op5 == "01100" || op5 == "11000")
             op2Sel = 0;
         else
             op2Sel = 1;
@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
             rs1 = PC;
         if (CW.op2Sel)
             rs2 = imm;
-        else if (CW.jump != "00")
+        if (CW.jump != "00")
             rs2 = 4;
         string ALUsel = ALUcontrol(CW.ALUop, f3, f7);
         ALU aluRes(ALUsel, rs1, rs2);
@@ -336,8 +336,7 @@ int main(int argc, char *argv[])
         }
         regFile[0] = 0;
     }
-    // for (auto &i : regFile)
-    //     cout << i << "\n";
+    
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())
