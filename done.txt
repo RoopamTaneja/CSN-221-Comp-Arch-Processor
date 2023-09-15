@@ -10,11 +10,11 @@ registers.h
 assembler.cpp
 createEmptyDataFiles.cpp
 Truth_Table.xlsx
+References
+simulator.cpp
 
 PENDING
-References
 README.md
-simulator.cpp
 
 
 Testing files
@@ -25,6 +25,4 @@ done.txt
 hex.txt
 sample.cpp
 save.txt
-test.s
 data.txt
-new.cpp

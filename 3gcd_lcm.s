@@ -21,7 +21,7 @@ loop_gcd:
     li a3, 1
     blt a6, a3, exit # while (a6>0)
     rem a0, a4, a6 # a0 = a4%a6
-    rem a1, a5, a6 # a1 = a4%a6
+    rem a1, a5, a6 # a1 = a5%a6
     or a2, a0, a1 # a0 or a1 == 0 only iff both rem == 0
     beq a2, zero, store_n_print_gcd # in that case it's our gcd
     addi a6, a6, -1 # a6--

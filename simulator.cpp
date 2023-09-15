@@ -1,3 +1,5 @@
+// Single cycle non-pipelined RISC-V processor simulator
+
 #include <iostream>
 #include <iomanip>
 #include <vector>
