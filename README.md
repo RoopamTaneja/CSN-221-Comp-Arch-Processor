@@ -22,6 +22,9 @@ pls don't start label names with digits (no labels for jalr)
 
 
 In your final binary, don't have any blank lines in start, middle or end (V.IMP), or anything else except pure 0s and 1s;
+### aur bhi mods hain waise
+## Control word :
+I only need 5 bits of 
 
 Data file format : 
 0x0000: data

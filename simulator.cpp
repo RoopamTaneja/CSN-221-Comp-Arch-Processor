@@ -122,9 +122,9 @@ int immGen(const string instr, string immSel)
         imm = INT32_MIN;
     else if (immSel == "001") // i-type imm
         imm = dec_sign_imm(instr.substr(0, 12));
-    else if (immSel == "010")
+    else if (immSel == "010") // s-type imm
         imm = dec_sign_imm(instr.substr(0, 7) + instr.substr(20, 5));
-    else if (immSel == "011")
+    else if (immSel == "011") // b-type imm
     {
         string offset = "";
         offset += instr[0] + instr[24];
@@ -132,7 +132,7 @@ int immGen(const string instr, string immSel)
         imm = dec_sign_imm(offset);
         imm <<= 1;
     }
-    else if (immSel == "100")
+    else if (immSel == "100") // j type imm
     {
         string offset = "";
         offset += instr[0];
@@ -142,7 +142,7 @@ int immGen(const string instr, string immSel)
         imm = dec_sign_imm(offset);
         imm <<= 1;
     }
-    else if (immSel == "101")
+    else if (immSel == "101") // u type imm
     {
         imm = dec_sign_imm(instr.substr(0, 20));
         imm <<= 12;
