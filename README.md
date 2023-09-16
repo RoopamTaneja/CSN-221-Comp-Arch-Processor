@@ -1,7 +1,17 @@
+# CSN-221 Course Project
 
-#GUI :
-https://gitlab.com/luplab/rvcodecjs -- repo
-https://luplab.gitlab.io/rvcodecjs/ -- link
+This project was made as part of course CSN-221 : Computer Architecture and Microprocessors.<br>The project statement is in the References folder.<br>
+
+## Contents :
+- Three sample programs written in RISC-V assembly language<br>
+&emsp;> 1prime.s : Check if a number stored in memory is prime or not.<br>
+&emsp;> 2factorial.s : Calculate factorial of a number stored in memory location.<br>
+&emsp;> 3gcd_lcm.s : Calculate GCD and LCM of two numbers stored in memory.<br>
+
+- An assembler written in C++ (assembler.cpp) which converts RISC-V assembly codes to binary and hex encodings.
+
+- A non-pipelined simulator written in C++ (simulator.cpp) that executes instructions encoded in binary format and writes back into a .txt file it uses as memory.
+
 
 ONLY RV32I + M ext + li pseudo (25 instr)
 (No floating points)
@@ -41,4 +51,12 @@ your memory addr in instr should be range : 0x00 to (i mean it's quite customisa
 otherwise single cycle non-pipelined cpu is done...it encodes and runs all programs written with those 25 instructions and gives right ans.
 
 scalable banaya hai (esp assembler), u can easily add more RV32I instructions or pseudo in future after u get a hang of the code. U can also modify the simulator but thoda effor daalke truth_table ko samjhna and then go about it
-## Cheers!!!
+
+### GUI :
+Not sure if I will make the GUI. Even if I don't this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
+**Webpage** : https://luplab.gitlab.io/rvcodecjs/<br> 
+**Repository** : https://gitlab.com/luplab/rvcodecjs<br>
+
+*Though adding all references used is not possible yet the ones which have been most helpful while making this project have been highlighted in the References folder. A lot of inputs and ideas have been taken from these references.*
+
+## Cheers !!!
