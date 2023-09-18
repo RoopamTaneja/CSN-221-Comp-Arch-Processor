@@ -1,62 +1,96 @@
 # CSN-221 Course Project
 
-This project was made as part of course CSN-221 : Computer Architecture and Microprocessors.<br>The project statement is in the References folder.<br>
+This project was made as part of course CSN-221 : Computer Architecture and Microprocessors in Autumn Semester 2023-24.<br>The project statement is in the References folder.<br>
 
 ## Contents :
-- Three sample programs written in RISC-V assembly language<br>
-&emsp;> 1prime.s : Check if a number stored in memory is prime or not.<br>
-&emsp;> 2factorial.s : Calculate factorial of a number stored in memory location.<br>
-&emsp;> 3gcd_lcm.s : Calculate GCD and LCM of two numbers stored in memory.<br>
+- Three sample programs written in RISC-V assembly language :<br>
+&emsp;> `1prime.s` : Check if a number stored in memory is prime or not.<br>
+&emsp;> `2factorial.s` : Calculate factorial of a number stored in memory.<br>
+&emsp;> `3gcd_lcm.s` : Calculate GCD and LCM of two numbers stored in memory.<br>
+The assembly programs are self-explanatory and should run fine on any RISC-V simulator.<br>
+The user can modify *ecall* and other auxiliary statements as per need.
 
-- An assembler written in C++ (assembler.cpp) which converts RISC-V assembly codes to binary and hex encodings.
+- An assembler written in C++ `assembler.cpp` which converts RISC-V assembly codes to binary and hex encodings.
 
-- A non-pipelined simulator written in C++ (simulator.cpp) that executes instructions encoded in binary format and writes back into a .txt file it uses as memory.
+- A non-pipelined simulator written in C++ `simulator.cpp` that executes instructions encoded in binary format and writes back into a .txt file it uses as memory.
 
+- A 5-stage pipelined simulator written in C++ `pipelined_simulator.cpp` // DOES NOTHING AS OF NOW
 
-ONLY RV32I + M ext + li pseudo (25 instr)
-(No floating points)
+## Assembler Description and Usage Guidelines :
 
-USE ABIs for registers ONLY
+The assembler will take as arguments 1 .txt file containing your RISC-V assembly program and 2 empty .txt files, one for outputting binary encoding and other for hex encoding.<br>
+The hex encoding file is only meant for readability and includes instruction starting addresses as well.
+<br><br>
+**Commands:**<br>
+After compiling `assembler.cpp`, run:
+```shell
+./<file_name>.exe <assembly_file>.txt <binary_file>.txt <hex_file>.txt
+```
+You can create your own .txt files or use the sample `asm.txt`, `bin.txt` and `hex.txt` present in the repository. `asm.txt` also contains three sample assembly programs ready to be fed to the assembler (ofcourse, use one at a time).<br>
 
-types of lines in asm : 
-1) blank lines
-2) labels - <label_name><:><space><only comments(optional)>
-3) instr
-PS : No instr after label in same line
-4) comments can come after 2, 3, or solely comments also
-5) addi r1, r2, r3 (1 whitespace only, whitespace is important, commas not so much)
-6) pls no extra instructions and no wrong syntaxes
+**Guidelines:**
+1. Only integer instructions supported.
+2. Supported instructions:<br>
+&emsp;R-type: `add, sub, xor, or, and, sll, sra, rem, mul, div`<br>
+&emsp;I-type: `addi, xori, ori, andi, slli, srai`<br>
+&emsp;Load-Store: `lw, sw`<br>
+&emsp;B-Type: `beq, blt`<br>
+&emsp;Jump: `jal, jalr`<br>
+&emsp;U-Type: `lui, auipc`<br>
+&emsp;**Pseudo:** `li` *(Encoding it took significant effort)*
 
-Labels support for b-type and j-type (not u-type), u can give labels or even write numeric OFFSET (not line no if numeric) (offset from PC)
-pls don't start label names with digits (no labels for jalr)
+3. Use ABI names for register operands in assembly code.
 
+4. Positive immediates can be written in either decimal or hexadecimal formats but only decimal format for negative immediates (to avoid confusion).
 
-In your final binary, don't have any blank lines in start, middle or end (V.IMP), or anything else except pure 0s and 1s;
-### aur bhi mods hain waise
-## Control word :
-I only need 5 bits of 
+5. Types of statements allowed: <br>
+&emsp;- Labels - `<label_name><:><space><comments(optional)>`<br>
+&emsp;&emsp;***No instruction should come after label in the same line***<br>
+&emsp;- Instructions - maybe followed by comments<br>
+&emsp;&emsp;eg: `addi r1, r2, r3` ***(1 whitespace only, whitespace is important, commas not so much)***<br>
+&emsp;- Only comments<br>
+&emsp;&emsp;*Everything after # is treated as comment.*<br>
+&emsp;- Blank lines<br><br>
+**PS:** No unsupported instructions or wrong syntaxes<br>
 
-Data file format : 
-0x0000: data
-0x0004: data
-..
- addr and data in format above 
- <addr: data>...addr in multiples of 4 starting from 0 but any format  and any range ok
-in data file : don't have any blank lines in start, middle or end (V.IMP), or anything else (use createEmp...cpp for it)
+6. Labels are supported for B-type and J-type instructions (not U-type or JALR). Label name must NOT start with a digit.<br>
+Provide either labels or numeric offset from PC.
 
-READS and Writes only decimal values from and to Data Memory
+**PS:** `hex_dict.h, nf7_type.h, opcode.h, registers.h, r_type.h` are header files used by `assembler.cpp` and all of them should be kept in the same folder.
 
-your memory addr in instr should be range : 0x00 to (i mean it's quite customisable)
+## Simulator Description and Usage Guidelines :
 
-otherwise single cycle non-pipelined cpu is done...it encodes and runs all programs written with those 25 instructions and gives right ans.
+The simulator will take as arguments one .txt file containing your binary encoding of instructions and another .txt acting as memory.
+<br><br>
+**Commands:**<br>
+After compiling `simulator.cpp`, run:
+```shell
+./<file_name>.exe <binary_file>.txt <memory_file>.txt
+```
+You can create your own .txt files or use the sample `bin.txt` and `data.txt` present in the repository.<br>
 
-scalable banaya hai (esp assembler), u can easily add more RV32I instructions or pseudo in future after u get a hang of the code. U can also modify the simulator but thoda effor daalke truth_table ko samjhna and then go about it
+**Guidelines:**
+1. In your final binary file, don't have anything other than pure 0s and 1s (not even blank lines).
+
+2. Data file format : <br>
+0x0000: \<data\><br>
+0x0004: \<data\>...<br>
+Address should from 0 and be in multiples of 4. The range of address is not restricted.<br> You can use the `createEmptyDataFile.cpp` to make the memory file instantly. Compile and run it with the name of .txt file you are using as memory.<br>
+Also don't have any other data or unnecessary blank lines.<br>
+
+3. The data should only be DECIMAL values.
+
+### Do have a look at `truth_table.xlsx`, it tabulates the signals which make up the control word, their meaning and the few design choices made to simplify the design.
+
+The attempt has been to make the assembler and simulator as scalable and extendable as possible.<br>
+It should not be tough to add more RV32I instructions or pseudo instructions in future once you get a hang of the code. Scaling the assembler is comparatively easier than the simulator for which you may need to analyse and modify the `truth_table.xlsx`.
 
 ### GUI :
-Not sure if I will make the GUI. Even if I don't this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
+Not sure if I will make the GUI. Even if I don't, this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
 **Webpage** : https://luplab.gitlab.io/rvcodecjs/<br> 
 **Repository** : https://gitlab.com/luplab/rvcodecjs<br>
 
 *Though adding all references used is not possible yet the ones which have been most helpful while making this project have been highlighted in the References folder. A lot of inputs and ideas have been taken from these references.*
-
+<br><br>
+*Feel free to report bugs or make pull requests.*
 ## Cheers !!!
