@@ -227,6 +227,132 @@ public:
     }
 };
 
+// #changes
+class pipelineRegister
+{
+public:
+    bool valid = false, stall = false;
+};
+
+class pc : public pipelineRegister
+{
+public:
+    int IA;
+};
+
+class ifid : public pipelineRegister
+{
+public:
+    int DPC;
+    string instr_reg;
+};
+
+class idex : public pipelineRegister
+{
+public:
+    int DPC_JPC;
+    int imm;
+    Controller CW;
+    int rs1, rs2, rdl;
+    string f3;
+    bool f7;
+    idex() : CW("00000", "xxx") {}
+};
+
+class exmo : public pipelineRegister
+{
+public:
+    Controller CW;
+    int ALUout;
+    int rs2, rdl;
+    exmo() : CW("00000", "xxx") {}
+};
+
+class mowb : public pipelineRegister
+{
+public:
+    Controller CW;
+    int ALUout, LDout;
+    int rdl;
+    mowb() : CW("00000", "xxx") {}
+};
+
+void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
+{
+    IFID.instr_reg = IM[PC.IA];
+}
+
+void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
+{
+    string op5 = IFID.instr_reg.substr(25, 5);
+    string f3 = IFID.instr_reg.substr(17, 3);
+    Controller CW(op5, f3);
+    IDEX.CW = CW;
+    IDEX.f3 = f3;
+    IDEX.f7 = IFID.instr_reg[6];
+    IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
+
+    IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+    int rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
+    int rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
+    IDEX.rs1 = 0, IDEX.rs2 = 0;
+    if (CW.regRead)
+    {
+        IDEX.rs1 = regFile[rsl1];
+        IDEX.rs2 = regFile[rsl2];
+    }
+}
+
+void instr_execute(idex &IDEX, exmo &EXMO)
+{
+    // if (IDEX.CW.op1Sel)
+    //     IDEX.rs1 = PC;
+    // if (CW.op2Sel)
+    //     rs2 = imm;
+    // if (CW.jump != "00")
+    //     rs2 = 4;
+    string ALUsel = ALUcontrol(IDEX.CW.ALUop, IDEX.f3, IDEX.f7);
+    ALU aluRes(ALUsel, IDEX.rs1, IDEX.rs2);
+    EXMO.CW = IDEX.CW;
+    // int JPC;
+    // if (CW.jump == "01") // jal
+    //     JPC = PCn + imm;
+    // else if (CW.jump == "10") // jalr
+    //     JPC = rs1 + imm;
+
+    // int BPC = PCn + imm;
+    // if (CW.jump != "00")
+    //     PCn = JPC;
+    // else if ((CW.branch == "01" && aluRes.zeroFlag) || CW.branch == "10" && aluRes.LTflag)
+    //     PCn = BPC;
+    // else
+    //     PCn += 4;
+}
+
+void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb &MOWB)
+{
+    int LDres;
+    if (EXMO.CW.memWrite && EXMO.CW.regRead)
+    {
+        // EXMO.rs2 = regFile[rsl2];
+        DM[EXMO.ALUout / 4] = EXMO.rs2;
+    }
+    if (EXMO.CW.memRead)
+        LDres = DM[EXMO.ALUout / 4];
+}
+
+void writeback(std::vector<int> &regFile, mowb &MOWB)
+{
+    if (MOWB.CW.regWrite)
+    {
+        if (MOWB.CW.mem2Reg)
+            regFile[MOWB.rdl] = MOWB.LDout;
+        else
+            regFile[MOWB.rdl] = MOWB.ALUout;
+    }
+    regFile[0] = 0;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 3)
@@ -271,75 +397,24 @@ int main(int argc, char *argv[])
     int numInstr = IM.size();
     std::vector<int> regFile(32, 0);
 
-    // Executing the instr
-    // need to work here
-    // int PC = 0;
-    // while (PC != numInstr * 4)
-    // {
-    //     // stage 1
-    //     string instr = IM[PC / 4];
+    // #changes
+    // Pipeline
+    pc PC;
+    ifid IFID;
+    idex IDEX;
+    exmo EXMO;
+    mowb MOWB;
 
-    //     // stage 2
-    //     string op5 = instr.substr(25, 5);
-    //     string f3 = instr.substr(17, 3);
-    //     char f7 = instr[6];
-    //     int rsl1 = stoi(instr.substr(12, 5), NULL, 2);
-    //     int rsl2 = stoi(instr.substr(7, 5), NULL, 2);
-    //     int rdl = stoi(instr.substr(20, 5), NULL, 2);
-    //     Controller CW(op5, f3);
-    //     int imm = immGen(instr, CW.immSel);
-    //     int rs1 = 0, rs2 = 0;
-    //     if (CW.regRead)
-    //     {
-    //         rs1 = regFile[rsl1];
-    //         rs2 = regFile[rsl2];
-    //     }
-
-    //     // stage 3
-    //     if (CW.op1Sel)
-    //         rs1 = PC;
-    //     if (CW.op2Sel)
-    //         rs2 = imm;
-    //     if (CW.jump != "00")
-    //         rs2 = 4;
-    //     string ALUsel = ALUcontrol(CW.ALUop, f3, f7);
-    //     ALU aluRes(ALUsel, rs1, rs2);
-
-    //     int JPC;
-    //     if (CW.jump == "01") // jal
-    //         JPC = PC + imm;
-    //     else if (CW.jump == "10") // jalr
-    //         JPC = rs1 + imm;
-
-    //     int BPC = PC + imm;
-    //     if (CW.jump != "00")
-    //         PC = JPC;
-    //     else if ((CW.branch == "01" && aluRes.zeroFlag) || CW.branch == "10" && aluRes.LTflag)
-    //         PC = BPC;
-    //     else
-    //         PC = PC + 4;
-
-    //     // stage 4
-    //     int LDres;
-    //     if (CW.memWrite && CW.regRead)
-    //     {
-    //         rs2 = regFile[rsl2];
-    //         DM[aluRes.ALUresult / 4] = rs2;
-    //     }
-    //     if (CW.memRead)
-    //         LDres = DM[aluRes.ALUresult / 4];
-
-    //     // stage 5
-    //     if (CW.regWrite)
-    //     {
-    //         if (CW.mem2Reg)
-    //             regFile[rdl] = LDres;
-    //         else
-    //             regFile[rdl] = aluRes.ALUresult;
-    //     }
-    //     regFile[0] = 0;
-    // }
-    
+    int PCn = 0;
+    while (PCn != numInstr * 4)
+    {
+        instr_fetch(IM, PC, IFID);
+        instr_decode(regFile, IFID, IDEX);
+        instr_execute(IDEX, EXMO);
+        memory_op(DM, regFile, EXMO, MOWB);
+        writeback(regFile, MOWB);
+    }
+    // #changes over
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())
