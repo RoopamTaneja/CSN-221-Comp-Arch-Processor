@@ -227,7 +227,6 @@ public:
     }
 };
 
-// #changes
 class pipelineRegister
 {
 public:
@@ -243,19 +242,18 @@ public:
 class ifid : public pipelineRegister
 {
 public:
-    int DPC;
+    int instr_PC;
     string instr_reg;
 };
 
 class idex : public pipelineRegister
 {
 public:
-    int DPC_JPC;
+    int instr_PC;
     int imm;
     Controller CW;
     int rs1, rs2, rdl;
-    string f3;
-    bool f7;
+    string ALUsel;
     idex() : CW("00000", "xxx") {}
 };
 
@@ -263,7 +261,7 @@ class exmo : public pipelineRegister
 {
 public:
     Controller CW;
-    int ALUout;
+    int ALUres;
     int rs2, rdl;
     exmo() : CW("00000", "xxx") {}
 };
@@ -272,31 +270,37 @@ class mowb : public pipelineRegister
 {
 public:
     Controller CW;
-    int ALUout, LDout;
+    int ALUres, LDres;
     int rdl;
     mowb() : CW("00000", "xxx") {}
 };
 
 void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
 {
-    IFID.instr_reg = IM[PC.IA];
+    IFID.instr_reg = IM[PC.IA / 4];
+    IFID.instr_PC = PC.IA;
+    PC.IA += 4; // doubts
 }
 
 void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
 {
+    IDEX.instr_PC = IFID.instr_PC;
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
+    char f7 = IFID.instr_reg[6];
     Controller CW(op5, f3);
     IDEX.CW = CW;
-    IDEX.f3 = f3;
-    IDEX.f7 = IFID.instr_reg[6];
+    IDEX.ALUsel = ALUcontrol(IDEX.CW.ALUop, f3, f7);
     IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
 
-    IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
     int rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
     int rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
+    if (IDEX.CW.immSel == "010") // for sw we need to forward rsl2 somehow so we r destroying rdl bcoz it isn't needed otherwise
+        IDEX.rdl = rsl2;
+    else
+        IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
     IDEX.rs1 = 0, IDEX.rs2 = 0;
-    if (CW.regRead)
+    if (IDEX.CW.regRead)
     {
         IDEX.rs1 = regFile[rsl1];
         IDEX.rs2 = regFile[rsl2];
@@ -305,19 +309,21 @@ void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
 
 void instr_execute(idex &IDEX, exmo &EXMO)
 {
-    // if (IDEX.CW.op1Sel)
-    //     IDEX.rs1 = PC;
-    // if (CW.op2Sel)
-    //     rs2 = imm;
-    // if (CW.jump != "00")
-    //     rs2 = 4;
-    string ALUsel = ALUcontrol(IDEX.CW.ALUop, IDEX.f3, IDEX.f7);
-    ALU aluRes(ALUsel, IDEX.rs1, IDEX.rs2);
+    if (IDEX.CW.op1Sel)
+        IDEX.rs1 = IDEX.instr_PC;
+    if (IDEX.CW.op2Sel)
+        IDEX.rs2 = IDEX.imm;
+    if (IDEX.CW.jump != "00")
+        IDEX.rs2 = 4;
+    ALU aluRes(IDEX.ALUsel, IDEX.rs1, IDEX.rs2);
+    EXMO.ALUres = aluRes.ALUresult;
     EXMO.CW = IDEX.CW;
-    // int JPC;
-    // if (CW.jump == "01") // jal
-    //     JPC = PCn + imm;
-    // else if (CW.jump == "10") // jalr
+    EXMO.rs2 = IDEX.rs2;
+    EXMO.rdl = IDEX.rdl;
+    int JPC; // doubts
+    // if (IDEX.CW.jump == "01") // jal
+    // IDEX.JPC = IDEX.DPC_JPC  + IDEX.imm;
+    // else if (IDEX.CW.jump == "10") // jalr
     //     JPC = rs1 + imm;
 
     // int BPC = PCn + imm;
@@ -331,14 +337,16 @@ void instr_execute(idex &IDEX, exmo &EXMO)
 
 void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb &MOWB)
 {
-    int LDres;
+    MOWB.CW = EXMO.CW;
+    MOWB.ALUres = EXMO.ALUres;
+    MOWB.rdl = EXMO.rdl;
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
-        // EXMO.rs2 = regFile[rsl2];
-        DM[EXMO.ALUout / 4] = EXMO.rs2;
+        EXMO.rs2 = regFile[EXMO.rdl];
+        DM[EXMO.ALUres / 4] = EXMO.rs2;
     }
     if (EXMO.CW.memRead)
-        LDres = DM[EXMO.ALUout / 4];
+        MOWB.LDres = DM[EXMO.ALUres / 4];
 }
 
 void writeback(std::vector<int> &regFile, mowb &MOWB)
@@ -346,9 +354,9 @@ void writeback(std::vector<int> &regFile, mowb &MOWB)
     if (MOWB.CW.regWrite)
     {
         if (MOWB.CW.mem2Reg)
-            regFile[MOWB.rdl] = MOWB.LDout;
+            regFile[MOWB.rdl] = MOWB.LDres;
         else
-            regFile[MOWB.rdl] = MOWB.ALUout;
+            regFile[MOWB.rdl] = MOWB.ALUres;
     }
     regFile[0] = 0;
 }
@@ -397,7 +405,6 @@ int main(int argc, char *argv[])
     int numInstr = IM.size();
     std::vector<int> regFile(32, 0);
 
-    // #changes
     // Pipeline
     pc PC;
     ifid IFID;
@@ -405,8 +412,8 @@ int main(int argc, char *argv[])
     exmo EXMO;
     mowb MOWB;
 
-    int PCn = 0;
-    while (PCn != numInstr * 4)
+    PC.IA = 0; // doubts
+    while (PC.IA != numInstr * 4)
     {
         instr_fetch(IM, PC, IFID);
         instr_decode(regFile, IFID, IDEX);
@@ -414,7 +421,7 @@ int main(int argc, char *argv[])
         memory_op(DM, regFile, EXMO, MOWB);
         writeback(regFile, MOWB);
     }
-    // #changes over
+
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())
