@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <iomanip>
+#include <chrono>
+#include <thread>
 #include <vector>
 #include <fstream>
 #include <sstream>
@@ -277,6 +279,7 @@ public:
 
 void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
 {
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
     PC.IA += 4; // doubts
@@ -285,6 +288,7 @@ void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
 void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
 {
     IDEX.instr_PC = IFID.instr_PC;
+    std::this_thread::sleep_for(std::chrono::microseconds(250));
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
     char f7 = IFID.instr_reg[6];
@@ -295,16 +299,17 @@ void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
 
     int rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
     int rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
+    IDEX.rs1 = 0, IDEX.rs2 = 0;
+    if (IDEX.CW.regRead)
+    {
+        std::this_thread::sleep_for(std::chrono::microseconds(50));
+        IDEX.rs1 = regFile[rsl1];
+        IDEX.rs2 = regFile[rsl2];
+    }
     if (IDEX.CW.immSel == "010") // for sw we need to forward rsl2 somehow so we r destroying rdl bcoz it isn't needed otherwise
         IDEX.rdl = rsl2;
     else
         IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
-    IDEX.rs1 = 0, IDEX.rs2 = 0;
-    if (IDEX.CW.regRead)
-    {
-        IDEX.rs1 = regFile[rsl1];
-        IDEX.rs2 = regFile[rsl2];
-    }
 }
 
 void instr_execute(idex &IDEX, exmo &EXMO)
@@ -315,11 +320,15 @@ void instr_execute(idex &IDEX, exmo &EXMO)
         IDEX.rs2 = IDEX.imm;
     if (IDEX.CW.jump != "00")
         IDEX.rs2 = 4;
-    ALU aluRes(IDEX.ALUsel, IDEX.rs1, IDEX.rs2);
-    EXMO.ALUres = aluRes.ALUresult;
-    EXMO.CW = IDEX.CW;
+
     EXMO.rs2 = IDEX.rs2;
     EXMO.rdl = IDEX.rdl;
+    EXMO.CW = IDEX.CW;
+
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    ALU aluRes(IDEX.ALUsel, IDEX.rs1, IDEX.rs2);
+    EXMO.ALUres = aluRes.ALUresult;
+
     int JPC; // doubts
     // if (IDEX.CW.jump == "01") // jal
     // IDEX.JPC = IDEX.DPC_JPC  + IDEX.imm;
@@ -342,17 +351,22 @@ void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb
     MOWB.rdl = EXMO.rdl;
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
         EXMO.rs2 = regFile[EXMO.rdl];
         DM[EXMO.ALUres / 4] = EXMO.rs2;
     }
     if (EXMO.CW.memRead)
+    {
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
         MOWB.LDres = DM[EXMO.ALUres / 4];
+    }
 }
 
 void writeback(std::vector<int> &regFile, mowb &MOWB)
 {
     if (MOWB.CW.regWrite)
     {
+        std::this_thread::sleep_for(std::chrono::microseconds(50));
         if (MOWB.CW.mem2Reg)
             regFile[MOWB.rdl] = MOWB.LDres;
         else
@@ -406,12 +420,13 @@ int main(int argc, char *argv[])
     std::vector<int> regFile(32, 0);
 
     // Pipeline
+    auto start = std::chrono::high_resolution_clock::now();
+
     pc PC;
     ifid IFID;
     idex IDEX;
     exmo EXMO;
     mowb MOWB;
-
     PC.IA = 0; // doubts
     while (PC.IA != numInstr * 4)
     {
@@ -421,6 +436,10 @@ int main(int argc, char *argv[])
         memory_op(DM, regFile, EXMO, MOWB);
         writeback(regFile, MOWB);
     }
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    cout << "Execution time of 5-stage pipelined: " << duration.count() << " microseconds\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);

@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <iomanip>
+#include <chrono>
+#include <thread>
 #include <vector>
 #include <fstream>
 #include <sstream>
@@ -272,13 +274,17 @@ int main(int argc, char *argv[])
     std::vector<int> regFile(32, 0);
 
     // Executing the instr
+    auto start = std::chrono::high_resolution_clock::now();
+
     int PC = 0;
     while (PC != numInstr * 4)
     {
         // stage 1
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
         string instr = IM[PC / 4];
 
         // stage 2
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
         string op5 = instr.substr(25, 5);
         string f3 = instr.substr(17, 3);
         char f7 = instr[6];
@@ -290,9 +296,11 @@ int main(int argc, char *argv[])
         int rs1 = 0, rs2 = 0;
         if (CW.regRead)
         {
+            std::this_thread::sleep_for(std::chrono::microseconds(50));
             rs1 = regFile[rsl1];
             rs2 = regFile[rsl2];
         }
+        string ALUsel = ALUcontrol(CW.ALUop, f3, f7);
 
         // stage 3
         if (CW.op1Sel)
@@ -301,7 +309,7 @@ int main(int argc, char *argv[])
             rs2 = imm;
         if (CW.jump != "00")
             rs2 = 4;
-        string ALUsel = ALUcontrol(CW.ALUop, f3, f7);
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
         ALU aluRes(ALUsel, rs1, rs2);
 
         int JPC;
@@ -322,15 +330,20 @@ int main(int argc, char *argv[])
         int LDres;
         if (CW.memWrite && CW.regRead)
         {
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
             rs2 = regFile[rsl2];
             DM[aluRes.ALUresult / 4] = rs2;
         }
         if (CW.memRead)
+        {
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
             LDres = DM[aluRes.ALUresult / 4];
+        }
 
         // stage 5
         if (CW.regWrite)
         {
+            std::this_thread::sleep_for(std::chrono::microseconds(50));
             if (CW.mem2Reg)
                 regFile[rdl] = LDres;
             else
@@ -338,7 +351,11 @@ int main(int argc, char *argv[])
         }
         regFile[0] = 0;
     }
-    
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    cout << "Execution time of non-pipelined: " << duration.count() << " microseconds\n";
+
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
     if (outData.bad())
