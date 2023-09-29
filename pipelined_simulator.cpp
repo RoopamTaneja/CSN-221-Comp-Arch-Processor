@@ -282,7 +282,7 @@ void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
     std::this_thread::sleep_for(std::chrono::microseconds(200));
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
-    PC.IA += 4; // doubts
+    PC.IA += 4;
 }
 
 void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
@@ -312,7 +312,7 @@ void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
 }
 
-void instr_execute(idex &IDEX, exmo &EXMO)
+void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
 {
     if (IDEX.CW.op1Sel)
         IDEX.rs1 = IDEX.instr_PC;
@@ -321,34 +321,29 @@ void instr_execute(idex &IDEX, exmo &EXMO)
     if (IDEX.CW.jump != "00")
         IDEX.rs2 = 4;
 
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    ALU aluRes(IDEX.ALUsel, IDEX.rs1, IDEX.rs2);
+
+    int JPC;
+    if (IDEX.CW.jump == "01") // jal
+        JPC = IDEX.instr_PC + IDEX.imm;
+    else if (IDEX.CW.jump == "10") // jalr
+        JPC = IDEX.rs1 + IDEX.imm;
+
+    int BPC = IDEX.instr_PC + IDEX.imm;
+    if (IDEX.CW.jump != "00")
+        PC.IA = JPC;
+    else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
+        PC.IA = BPC;
+
+    EXMO.ALUres = aluRes.ALUresult;
     EXMO.rs2 = IDEX.rs2;
     EXMO.rdl = IDEX.rdl;
     EXMO.CW = IDEX.CW;
-
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
-    ALU aluRes(IDEX.ALUsel, IDEX.rs1, IDEX.rs2);
-    EXMO.ALUres = aluRes.ALUresult;
-
-    int JPC; // doubts
-    // if (IDEX.CW.jump == "01") // jal
-    // IDEX.JPC = IDEX.DPC_JPC  + IDEX.imm;
-    // else if (IDEX.CW.jump == "10") // jalr
-    //     JPC = rs1 + imm;
-
-    // int BPC = PCn + imm;
-    // if (CW.jump != "00")
-    //     PCn = JPC;
-    // else if ((CW.branch == "01" && aluRes.zeroFlag) || CW.branch == "10" && aluRes.LTflag)
-    //     PCn = BPC;
-    // else
-    //     PCn += 4;
 }
 
 void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb &MOWB)
 {
-    MOWB.CW = EXMO.CW;
-    MOWB.ALUres = EXMO.ALUres;
-    MOWB.rdl = EXMO.rdl;
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
         std::this_thread::sleep_for(std::chrono::microseconds(200));
@@ -360,6 +355,9 @@ void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb
         std::this_thread::sleep_for(std::chrono::microseconds(200));
         MOWB.LDres = DM[EXMO.ALUres / 4];
     }
+    MOWB.CW = EXMO.CW;
+    MOWB.ALUres = EXMO.ALUres;
+    MOWB.rdl = EXMO.rdl;
 }
 
 void writeback(std::vector<int> &regFile, mowb &MOWB)
@@ -427,16 +425,16 @@ int main(int argc, char *argv[])
     idex IDEX;
     exmo EXMO;
     mowb MOWB;
-    PC.IA = 0; // doubts
+    PC.IA = 0;
     while (PC.IA != numInstr * 4)
     {
         instr_fetch(IM, PC, IFID);
         instr_decode(regFile, IFID, IDEX);
-        instr_execute(IDEX, EXMO);
+        instr_execute(IDEX, EXMO, PC);
         memory_op(DM, regFile, EXMO, MOWB);
         writeback(regFile, MOWB);
     }
-    
+
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     cout << "Execution time of 5-stage pipelined: " << duration.count() << " microseconds\n";
