@@ -237,6 +237,7 @@ class gpr
 public:
     int instr_id = -1;
     int value = 0;
+    gpr(int id = -1, int val = 0) : instr_id(id), value(val) {}
 };
 
 class pipelineRegister
@@ -286,7 +287,7 @@ public:
     int rdl;
     mowb() : CW(-1, "00000", "xxx") {}
 };
-
+// doubts ---start
 void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
 {
     if (!PC.valid || IFID.stall)
@@ -296,6 +297,7 @@ void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
     IFID.instr_PC = PC.IA;
     PC.IA += 4;
     IFID.valid = true;
+    cout << "\tStage 1 of instr " << IFID.instr_PC / 4 << "\n";
 }
 
 void instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
@@ -334,19 +336,20 @@ void instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
         }
         else
         {
+            cout << "Stalled\n";
             IFID.stall = true;
             return;
         }
     }
     if (IDEX.CW.immSel == "010") // for sw we need to forward rsl2 somehow so we r destroying rdl bcoz it isn't needed otherwise
-    {
         IDEX.rdl = rsl2;
-        regFile[IDEX.rdl].instr_id = IDEX.instr_PC / 4;
-    }
+
     else
         IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+    regFile[IDEX.rdl].instr_id = IDEX.CW.instr_id;
     IFID.stall = false;
     IDEX.valid = true;
+    cout << "\tStage 2 of instr " << IFID.instr_PC / 4 << "\n";
 }
 
 void instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
@@ -392,6 +395,7 @@ void instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
     EXMO.CW = IDEX.CW;
     IDEX.stall = false;
     EXMO.valid = true;
+    cout << "\tStage 3 of instr " << IDEX.CW.instr_id << "\n";
 }
 
 void memory_op(std::vector<int> &DM, std::vector<gpr> &regFile, exmo &EXMO, mowb &MOWB)
@@ -412,6 +416,9 @@ void memory_op(std::vector<int> &DM, std::vector<gpr> &regFile, exmo &EXMO, mowb
     MOWB.CW = EXMO.CW;
     MOWB.ALUres = EXMO.ALUres;
     MOWB.rdl = EXMO.rdl;
+    EXMO.stall = false;
+    MOWB.valid = true;
+    cout << "\tStage 4 of instr " << EXMO.CW.instr_id << "\n";
 }
 
 void writeback(std::vector<gpr> &regFile, mowb &MOWB)
@@ -427,12 +434,12 @@ void writeback(std::vector<gpr> &regFile, mowb &MOWB)
             regFile[MOWB.rdl].value = MOWB.ALUres;
 
         regFile[MOWB.rdl].instr_id = -1;
-        MOWB.stall = false;
-
-        regFile[0].value = 0; // for zero register's sake
     }
+    MOWB.stall = false;
+    regFile[0].value = 0; // for zero register's sake
+    cout << "\tStage 5 of instr " << MOWB.CW.instr_id << "\n";
 }
-
+// ---doubts end
 int main(int argc, char *argv[])
 {
     if (argc != 3)
@@ -475,7 +482,7 @@ int main(int argc, char *argv[])
 
     inInstr.close();
     int numInstr = IM.size();
-    std::vector<gpr> regFile;
+    std::vector<gpr> regFile(32, gpr());
 
     // Pipeline
     auto start = std::chrono::high_resolution_clock::now();
@@ -487,18 +494,21 @@ int main(int argc, char *argv[])
     mowb MOWB;
     PC.valid = true;
     PC.IA = 0;
-    // while (PC.IA != numInstr * 4)
-    // {
-    //     instr_fetch(IM, PC, IFID);
-    //     instr_decode(regFile, IFID, IDEX);
-    //     instr_execute(IDEX, EXMO, IFID, PC);
-    //     memory_op(DM, regFile, EXMO, MOWB);
-    //     writeback(regFile, MOWB);
-    // }
+    int cycle_no = 1;
+    while (PC.IA != numInstr * 4)
+    {
+        cout << "Cycle " << cycle_no << ": \n";
+        writeback(regFile, MOWB);
+        memory_op(DM, regFile, EXMO, MOWB);
+        instr_execute(IDEX, EXMO, IFID, PC);
+        instr_decode(regFile, IFID, IDEX);
+        instr_fetch(IM, PC, IFID);
+        cycle_no++;
+    }
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    cout << "Execution time of 5-stage pipelined: " << duration.count() << " microseconds\n";
+    cout << "\n\nExecution time of 5-stage pipeline with stalls: " << duration.count() << " microseconds\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
