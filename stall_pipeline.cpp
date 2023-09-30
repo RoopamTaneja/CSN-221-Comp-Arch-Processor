@@ -34,6 +34,7 @@ int dec_sign_imm(string s)
 class Controller
 {
 public:
+    int instr_id;
     bool op1Sel, op2Sel;
     string immSel, ALUop;
     bool regRead, regWrite;
@@ -58,8 +59,10 @@ public:
             immSel = "101", ALUop = "10";
     }
 
-    Controller(string op5, string f3)
+    Controller(int pc, string op5, string f3)
     {
+        instr_id = pc / 4;
+
         if (op5 == "11011" || op5 == "11001" || op5 == "00101")
             op1Sel = 1;
         else
@@ -229,6 +232,13 @@ public:
     }
 };
 
+class gpr
+{
+public:
+    int instr_id = -1;
+    int value = 0;
+};
+
 class pipelineRegister
 {
 public:
@@ -256,7 +266,7 @@ public:
     Controller CW;
     int rs1, rs2, rdl;
     string ALUsel;
-    idex() : CW("00000", "xxx") {}
+    idex() : CW(-1, "00000", "xxx") {}
 };
 
 class exmo : public pipelineRegister
@@ -265,7 +275,7 @@ public:
     Controller CW;
     int ALUres;
     int rs2, rdl;
-    exmo() : CW("00000", "xxx") {}
+    exmo() : CW(-1, "00000", "xxx") {}
 };
 
 class mowb : public pipelineRegister
@@ -274,25 +284,30 @@ public:
     Controller CW;
     int ALUres, LDres;
     int rdl;
-    mowb() : CW("00000", "xxx") {}
+    mowb() : CW(-1, "00000", "xxx") {}
 };
 
 void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
 {
+    if (!PC.valid || IFID.stall)
+        return;
     std::this_thread::sleep_for(std::chrono::microseconds(200));
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
     PC.IA += 4;
+    IFID.valid = true;
 }
 
-void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
+void instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
 {
+    if (!IFID.valid || IDEX.stall)
+        return;
     IDEX.instr_PC = IFID.instr_PC;
     std::this_thread::sleep_for(std::chrono::microseconds(250));
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
     char f7 = IFID.instr_reg[6];
-    Controller CW(op5, f3);
+    Controller CW(IFID.instr_PC, op5, f3);
     IDEX.CW = CW;
     IDEX.ALUsel = ALUcontrol(IDEX.CW.ALUop, f3, f7);
     IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
@@ -302,18 +317,42 @@ void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
     IDEX.rs1 = 0, IDEX.rs2 = 0;
     if (IDEX.CW.regRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(50));
-        IDEX.rs1 = regFile[rsl1];
-        IDEX.rs2 = regFile[rsl2];
+        if (regFile[rsl1].instr_id == -1)
+        {
+            std::this_thread::sleep_for(std::chrono::microseconds(25));
+            IDEX.rs1 = regFile[rsl1].value;
+        }
+        else
+        {
+            IFID.stall = true;
+            return;
+        }
+        if (regFile[rsl2].instr_id == -1)
+        {
+            std::this_thread::sleep_for(std::chrono::microseconds(25));
+            IDEX.rs2 = regFile[rsl2].value;
+        }
+        else
+        {
+            IFID.stall = true;
+            return;
+        }
     }
     if (IDEX.CW.immSel == "010") // for sw we need to forward rsl2 somehow so we r destroying rdl bcoz it isn't needed otherwise
+    {
         IDEX.rdl = rsl2;
+        regFile[IDEX.rdl].instr_id = IDEX.instr_PC / 4;
+    }
     else
         IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+    IFID.stall = false;
+    IDEX.valid = true;
 }
 
-void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
+void instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
 {
+    if (!IDEX.valid || EXMO.stall)
+        return;
     if (IDEX.CW.op1Sel)
         IDEX.rs1 = IDEX.instr_PC;
     if (IDEX.CW.op2Sel)
@@ -332,22 +371,37 @@ void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
 
     int BPC = IDEX.instr_PC + IDEX.imm;
     if (IDEX.CW.jump != "00")
+    {
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
         PC.IA = JPC;
+        PC.valid = true;
+        IFID.valid = false;
+        IDEX.valid = false;
+    }
     else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
+    {
         PC.IA = BPC;
+        PC.valid = true;
+        IFID.valid = false;
+        IDEX.valid = false;
+    }
 
     EXMO.ALUres = aluRes.ALUresult;
     EXMO.rs2 = IDEX.rs2;
     EXMO.rdl = IDEX.rdl;
     EXMO.CW = IDEX.CW;
+    IDEX.stall = false;
+    EXMO.valid = true;
 }
 
-void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb &MOWB)
+void memory_op(std::vector<int> &DM, std::vector<gpr> &regFile, exmo &EXMO, mowb &MOWB)
 {
+    if (!EXMO.valid || MOWB.stall)
+        return;
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
         std::this_thread::sleep_for(std::chrono::microseconds(200));
-        EXMO.rs2 = regFile[EXMO.rdl];
+        EXMO.rs2 = regFile[EXMO.rdl].value;
         DM[EXMO.ALUres / 4] = EXMO.rs2;
     }
     if (EXMO.CW.memRead)
@@ -360,17 +414,23 @@ void memory_op(std::vector<int> &DM, std::vector<int> &regFile, exmo &EXMO, mowb
     MOWB.rdl = EXMO.rdl;
 }
 
-void writeback(std::vector<int> &regFile, mowb &MOWB)
+void writeback(std::vector<gpr> &regFile, mowb &MOWB)
 {
-    if (MOWB.CW.regWrite)
+    if (!MOWB.valid)
+        return;
+    if (MOWB.CW.regWrite && regFile[MOWB.rdl].instr_id == MOWB.CW.instr_id)
     {
         std::this_thread::sleep_for(std::chrono::microseconds(50));
         if (MOWB.CW.mem2Reg)
-            regFile[MOWB.rdl] = MOWB.LDres;
+            regFile[MOWB.rdl].value = MOWB.LDres;
         else
-            regFile[MOWB.rdl] = MOWB.ALUres;
+            regFile[MOWB.rdl].value = MOWB.ALUres;
+
+        regFile[MOWB.rdl].instr_id = -1;
+        MOWB.stall = false;
+
+        regFile[0].value = 0; // for zero register's sake
     }
-    regFile[0] = 0;
 }
 
 int main(int argc, char *argv[])
@@ -415,22 +475,23 @@ int main(int argc, char *argv[])
 
     inInstr.close();
     int numInstr = IM.size();
-    std::vector<int> regFile(32, 0);
+    std::vector<gpr> regFile;
 
     // Pipeline
     auto start = std::chrono::high_resolution_clock::now();
 
-    // pc PC;
-    // ifid IFID;
-    // idex IDEX;
-    // exmo EXMO;
-    // mowb MOWB;
-    // PC.IA = 0;
+    pc PC;
+    ifid IFID;
+    idex IDEX;
+    exmo EXMO;
+    mowb MOWB;
+    PC.valid = true;
+    PC.IA = 0;
     // while (PC.IA != numInstr * 4)
     // {
     //     instr_fetch(IM, PC, IFID);
     //     instr_decode(regFile, IFID, IDEX);
-    //     instr_execute(IDEX, EXMO, PC);
+    //     instr_execute(IDEX, EXMO, IFID, PC);
     //     memory_op(DM, regFile, EXMO, MOWB);
     //     writeback(regFile, MOWB);
     // }
