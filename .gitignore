@@ -2,4 +2,3 @@
 *.exe
 timing.cpp
 rough.txt
-stall_pipeline.cpp

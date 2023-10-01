@@ -1,4 +1,4 @@
-// 5-stage pipelined RISC-V processor simulator
+// 5-stage pipelined RISC-V processor simulator with stalls
 
 #include <iostream>
 #include <iomanip>
@@ -34,6 +34,7 @@ int dec_sign_imm(string s)
 class Controller
 {
 public:
+    int instr_id;
     bool op1Sel, op2Sel;
     string immSel, ALUop;
     bool regRead, regWrite;
@@ -58,8 +59,10 @@ public:
             immSel = "101", ALUop = "10";
     }
 
-    Controller(string op5, string f3)
+    Controller(int pc, string op5, string f3)
     {
+        instr_id = pc / 4;
+
         if (op5 == "00101")
             op1Sel = 1;
         else
@@ -230,6 +233,14 @@ public:
     }
 };
 
+class gpr
+{
+public:
+    int instr_id = -1;
+    int value = 0;
+    gpr(int id = -1, int val = 0) : instr_id(id), value(val) {}
+};
+
 class pipelineRegister
 {
 public:
@@ -257,7 +268,7 @@ public:
     Controller CW;
     int rs1, rs2, rdl;
     string ALUsel;
-    idex() : CW("00000", "xxx") {}
+    idex() : CW(-1, "00000", "xxx") {}
 };
 
 class exmo : public pipelineRegister
@@ -266,7 +277,7 @@ public:
     Controller CW;
     int ALUres;
     int rs2, rdl;
-    exmo() : CW("00000", "xxx") {}
+    exmo() : CW(-1, "00000", "xxx") {}
 };
 
 class mowb : public pipelineRegister
@@ -275,59 +286,127 @@ public:
     Controller CW;
     int ALUres, LDres;
     int rdl;
-    mowb() : CW("00000", "xxx") {}
+    mowb() : CW(-1, "00000", "xxx") {}
 };
-
-void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
+// doubts ---start
+string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
 {
-    std::this_thread::sleep_for(std::chrono::microseconds(200));
+    if (!PC.valid)
+    {
+        if (!IFID.stall)
+            IFID.valid = false;
+        return "\tStage 1: -NIL-\t";
+    }
+    string ans = ("\tStage 1: ins " + std::to_string(PC.IA / 4) + "\t");
+    if (IFID.stall)
+    {
+        PC.stall = true;
+        return ans;
+    }
+    std::this_thread::sleep_for(std::chrono::microseconds(2000));
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
     PC.IA += 4;
+    PC.stall = false;
+    IFID.valid = true;
+    return ans;
 }
 
-void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
+string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
 {
+    if (!IFID.valid)
+    {
+        if (!IDEX.stall)
+            IDEX.valid = false;
+        return "\tStage 2: -NIL-\t";
+    }
+    string ans = ("\tStage 2: ins " + std::to_string(IFID.instr_PC / 4) + "\t");
+    if (IDEX.stall)
+    {
+        IFID.stall = true;
+        return ans;
+    }
+
     IDEX.instr_PC = IFID.instr_PC;
-    std::this_thread::sleep_for(std::chrono::microseconds(250));
+    std::this_thread::sleep_for(std::chrono::microseconds(2500));
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
     char f7 = IFID.instr_reg[6];
-    Controller CW(op5, f3);
+    Controller CW(IFID.instr_PC, op5, f3);
     IDEX.CW = CW;
     IDEX.ALUsel = ALUcontrol(IDEX.CW.ALUop, f3, f7);
     IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
     IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+    regFile[IDEX.rdl].instr_id = IDEX.CW.instr_id;
 
     int rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
     int rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
     IDEX.rs1 = 0, IDEX.rs2 = 0;
-
     if (IDEX.CW.op1Sel) // auipc
         IDEX.rs1 = IDEX.instr_PC;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
-        IDEX.rs1 = regFile[rsl1];
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        if (regFile[rsl1].instr_id == -1)
+            IDEX.rs1 = regFile[rsl1].value;
+        else
+        { // Stalled
+            IFID.stall = true;
+            IDEX.valid = false;
+            IDEX.stall = true;
+            return ans;
+        }
     }
 
     if (IDEX.CW.op2Sel)
         IDEX.rs2 = IDEX.imm;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
-        IDEX.rs2 = regFile[rsl2];
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        if (regFile[rsl2].instr_id == -1)
+            IDEX.rs2 = regFile[rsl2].value;
+        else
+        { // Stalled
+            IFID.stall = true;
+            IDEX.valid = false;
+            IDEX.stall = true;
+            return ans;
+        }
     }
     if ((IDEX.CW.immSel == "010"))
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
-        IDEX.rdl = regFile[rsl2];
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        if (regFile[rsl2].instr_id == -1)
+            IDEX.rdl = regFile[rsl2].value; // for sw we need to forward rs2 somehow so we r destroying rdl bcoz it isn't needed otherwise
+        else
+        { // Stalled
+            IFID.stall = true;
+            IDEX.valid = false;
+            IDEX.stall = true;
+            return ans;
+        }
     }
+    IFID.stall = false;
+    IDEX.valid = true;
+    return ans;
 }
 
-void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
+string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
 {
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    if (!IDEX.valid)
+    {
+        if (!EXMO.stall)
+            EXMO.valid = false;
+        return "\tStage 3: -NIL-\t";
+    }
+    string ans = ("\tStage 3: ins " + std::to_string(IDEX.CW.instr_id) + "\t");
+    if (EXMO.stall)
+    {
+        IDEX.stall = true;
+        return ans;
+    }
+
+    std::this_thread::sleep_for(std::chrono::microseconds(1000));
     ALU aluRes;
     if (IDEX.CW.jump != "00")
     {
@@ -347,56 +426,98 @@ void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
         JPC = IDEX.rs1 + IDEX.imm;
 
     int BPC = IDEX.instr_PC + IDEX.imm;
-    if (IDEX.CW.jump != "00")
-        PC.IA = JPC;
-    else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
-        PC.IA = BPC;
+    // if (IDEX.CW.jump != "00")
+    // {
+    //     PC.IA = JPC;
+    //     PC.valid = true;
+    //     IFID.valid = false;
+    //     IDEX.valid = false;
+    // }
+    // else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
+    // {
+    //     PC.IA = BPC;
+    //     PC.valid = true;
+    //     IFID.valid = false;
+    //     IDEX.valid = false;
+    // }
 
     EXMO.ALUres = aluRes.ALUresult;
     EXMO.rs2 = IDEX.rs2;
     EXMO.rdl = IDEX.rdl;
     EXMO.CW = IDEX.CW;
+    IDEX.stall = false;
+    EXMO.valid = true;
+    return ans;
 }
 
-void memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
+string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
 {
+    if (!EXMO.valid)
+    {
+        if (!MOWB.stall)
+            MOWB.valid = false;
+        return "\tStage 4: -NIL-\t";
+    }
+    string ans = ("\tStage 4: ins " + std::to_string(EXMO.CW.instr_id) + "\t");
+    if (MOWB.stall)
+    {
+        EXMO.stall = true;
+        return ans;
+    }
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        std::this_thread::sleep_for(std::chrono::microseconds(2000));
         DM[EXMO.ALUres / 4] = EXMO.rdl;
     }
     if (EXMO.CW.memRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        std::this_thread::sleep_for(std::chrono::microseconds(2000));
         MOWB.LDres = DM[EXMO.ALUres / 4];
     }
     MOWB.CW = EXMO.CW;
     MOWB.ALUres = EXMO.ALUres;
     MOWB.rdl = EXMO.rdl;
+    EXMO.stall = false;
+    MOWB.valid = true;
+    return ans;
 }
 
-void writeback(std::vector<int> &regFile, mowb &MOWB)
+string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX)
 {
-    if (MOWB.CW.regWrite)
+    if (!MOWB.valid)
+        return "\tStage 5: -NIL-\n";
+    string ans = "\tStage 5: ins " + std::to_string(MOWB.CW.instr_id) + "\n";
+    if (MOWB.stall)
+        return ans;
+    if (MOWB.CW.regWrite && regFile[MOWB.rdl].instr_id == MOWB.CW.instr_id)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
         if (MOWB.CW.mem2Reg)
-            regFile[MOWB.rdl] = MOWB.LDres;
+            regFile[MOWB.rdl].value = MOWB.LDres;
         else
-            regFile[MOWB.rdl] = MOWB.ALUres;
-    }
-    regFile[0] = 0;
-}
+            regFile[MOWB.rdl].value = MOWB.ALUres;
 
+        regFile[MOWB.rdl].instr_id = -1;
+        IDEX.stall = false; // Decode and WB can happen in same cycle (Structural soln)
+    }
+    MOWB.stall = false;
+    regFile[0].value = 0;
+    return ans;
+}
+// ---doubts end
 int main(int argc, char *argv[])
 {
-    if (argc != 3)
-    {
-        cout << "Incorrect Format\n";
-        return 0;
-    }
-    string instrFile = argv[1];
-    string dataFile = argv[2];
+    // if (argc != 4)
+    // {
+    //     cout << "Incorrect Format\n";
+    //     return 0;
+    // }
+    // string instrFile = argv[1];
+    // string dataFile = argv[2];
+    // string cycleFile = argv[3];
+    string instrFile = "bin.txt";
+    string dataFile = "data.txt";
+    string cycleFile = "cycle.txt";
     string instrLine, dataLine;
     // Loading the data into program DM
     std::vector<int> DM;
@@ -430,29 +551,48 @@ int main(int argc, char *argv[])
 
     inInstr.close();
     int numInstr = IM.size();
-    std::vector<int> regFile(32, 0);
+
+    // For outputting cycle-wise stage description
+    std::ofstream outCycle(cycleFile, std::ios::trunc);
+    if (outCycle.bad())
+    {
+        cout << "Error in opening : " << cycleFile << "\n";
+        return 0;
+    }
 
     // Pipeline
     auto start = std::chrono::high_resolution_clock::now();
 
+    std::vector<gpr> regFile(32, gpr());
     pc PC;
     ifid IFID;
     idex IDEX;
     exmo EXMO;
     mowb MOWB;
+    PC.valid = true;
     PC.IA = 0;
-    while (PC.IA != numInstr * 4)
+    int cycle_no = 1;
+    std::vector<string> stage_desc;
+    while (PC.valid || IFID.valid || IDEX.valid || EXMO.valid || MOWB.valid)
     {
-        instr_fetch(IM, PC, IFID);
-        instr_decode(regFile, IFID, IDEX);
-        instr_execute(IDEX, EXMO, PC);
-        memory_op(DM, EXMO, MOWB);
-        writeback(regFile, MOWB);
+        if (PC.IA >= numInstr * 4)
+            PC.valid = false;
+        outCycle << "Cycle " << cycle_no << ": \n";
+        stage_desc.emplace_back(writeback(regFile, MOWB, IDEX));
+        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB));
+        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, PC));
+        stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX));
+        stage_desc.emplace_back(instr_fetch(IM, PC, IFID));
+        for (int i = 4; i >= 0; i--)
+            outCycle << stage_desc[i];
+        stage_desc.clear();
+        cycle_no++;
     }
 
+    outCycle.close();
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    cout << "Execution time of 5-stage pipeline: " << duration.count() << " microseconds\n";
+    cout << "Execution time of 5-stage pipeline with stalls: " << duration.count() << " microseconds\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
