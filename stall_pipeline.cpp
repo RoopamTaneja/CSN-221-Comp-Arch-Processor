@@ -303,7 +303,7 @@ string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
         PC.stall = true;
         return ans;
     }
-    std::this_thread::sleep_for(std::chrono::microseconds(2000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
     PC.IA += 4;
@@ -328,7 +328,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
     }
 
     IDEX.instr_PC = IFID.instr_PC;
-    std::this_thread::sleep_for(std::chrono::microseconds(2500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
     char f7 = IFID.instr_reg[6];
@@ -346,7 +346,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rs1 = IDEX.instr_PC;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
         if (regFile[rsl1].instr_id == -1)
             IDEX.rs1 = regFile[rsl1].value;
         else
@@ -362,7 +362,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rs2 = IDEX.imm;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
         if (regFile[rsl2].instr_id == -1)
             IDEX.rs2 = regFile[rsl2].value;
         else
@@ -375,7 +375,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
     }
     if ((IDEX.CW.immSel == "010"))
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
         if (regFile[rsl2].instr_id == -1)
             IDEX.rdl = regFile[rsl2].value; // for sw we need to forward rs2 somehow so we r destroying rdl bcoz it isn't needed otherwise
         else
@@ -406,7 +406,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
         return ans;
     }
 
-    std::this_thread::sleep_for(std::chrono::microseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     ALU aluRes;
     if (IDEX.CW.jump != "00")
     {
@@ -466,12 +466,12 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
     }
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(2000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         DM[EXMO.ALUres / 4] = EXMO.rdl;
     }
     if (EXMO.CW.memRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(2000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         MOWB.LDres = DM[EXMO.ALUres / 4];
     }
     MOWB.CW = EXMO.CW;
@@ -491,7 +491,7 @@ string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX)
         return ans;
     if (MOWB.CW.regWrite && regFile[MOWB.rdl].instr_id == MOWB.CW.instr_id)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
         if (MOWB.CW.mem2Reg)
             regFile[MOWB.rdl].value = MOWB.LDres;
         else
@@ -575,14 +575,20 @@ int main(int argc, char *argv[])
     std::vector<string> stage_desc;
     while (PC.valid || IFID.valid || IDEX.valid || EXMO.valid || MOWB.valid)
     {
+        auto cycle_start = std::chrono::high_resolution_clock::now();
+        
         if (PC.IA >= numInstr * 4)
             PC.valid = false;
-        outCycle << "Cycle " << cycle_no << ": \n";
+        outCycle << "Cycle " << cycle_no << ": ";
         stage_desc.emplace_back(writeback(regFile, MOWB, IDEX));
         stage_desc.emplace_back(memory_op(DM, EXMO, MOWB));
         stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, PC));
         stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX));
         stage_desc.emplace_back(instr_fetch(IM, PC, IFID));
+
+        auto cycle_end = std::chrono::high_resolution_clock::now();
+        auto cycle_duration = std::chrono::duration_cast<std::chrono::milliseconds>(cycle_end - cycle_start);
+        outCycle << "Time = : " << cycle_duration.count() << " milliseconds\n";
         for (int i = 4; i >= 0; i--)
             outCycle << stage_desc[i];
         stage_desc.clear();
@@ -591,8 +597,8 @@ int main(int argc, char *argv[])
 
     outCycle.close();
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    cout << "Execution time of 5-stage pipeline with stalls: " << duration.count() << " microseconds\n";
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    cout << "Execution time of 5-stage pipeline with stalls: " << duration.count() << " milliseconds\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);

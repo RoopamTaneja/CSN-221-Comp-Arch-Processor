@@ -2,3 +2,7 @@ lw a5, 0(zero)
 sub a4, a5, a6
 and a0, a5, a1
 sw a0, 4(zero)
+0: 0x00002783
+4: 0x0107A733
+8: 0x00B7F533
+12: 0x00A02223
