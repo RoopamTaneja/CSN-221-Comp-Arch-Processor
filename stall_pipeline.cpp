@@ -333,8 +333,6 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
     IDEX.CW = CW;
     IDEX.ALUsel = ALUcontrol(IDEX.CW.ALUop, f3, f7);
     IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
-    IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
-    regFile[IDEX.rdl].instr_id = IDEX.CW.instr_id;
 
     int rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
     int rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
@@ -386,6 +384,12 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
             return ans;
         }
     }
+    else if (IDEX.CW.immSel != "011") // lock when it's not B-type or S-type
+    {
+        IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+        regFile[IDEX.rdl].instr_id = IDEX.CW.instr_id;
+    }
+
     IFID.stall = false;
     IDEX.valid = true;
     return ans;
@@ -419,27 +423,27 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
         aluRes = res;
     }
 
-    // int JPC;
-    // if (IDEX.CW.jump == "01") // jal
-    //     JPC = IDEX.instr_PC + IDEX.imm;
-    // else if (IDEX.CW.jump == "10") // jalr
-    //     JPC = IDEX.rs1 + IDEX.imm;
+    int JPC;
+    if (IDEX.CW.jump == "01") // jal
+        JPC = IDEX.instr_PC + IDEX.imm;
+    else if (IDEX.CW.jump == "10") // jalr
+        JPC = IDEX.rs1 + IDEX.imm;
 
-    // int BPC = IDEX.instr_PC + IDEX.imm;
-    // if (IDEX.CW.jump != "00")
-    // {
-    //     PC.IA = JPC;
-    //     PC.valid = true;
-    //     IFID.valid = false;
-    //     IDEX.valid = false;
-    // }
-    // else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
-    // {
-    //     PC.IA = BPC;
-    //     PC.valid = true;
-    //     IFID.valid = false;
-    //     IDEX.valid = false;
-    // }
+    int BPC = IDEX.instr_PC + IDEX.imm;
+    if (IDEX.CW.jump != "00")
+    {
+        PC.IA = JPC;
+        PC.valid = true;
+        IFID.valid = false;
+        IDEX.valid = false;
+    }
+    else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
+    {
+        PC.IA = BPC;
+        PC.valid = true;
+        IFID.valid = false;
+        IDEX.valid = false;
+    }
 
     EXMO.ALUres = aluRes.ALUresult;
     EXMO.rs2 = IDEX.rs2;
@@ -500,7 +504,6 @@ string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX)
         regFile[MOWB.rdl].instr_id = -1;
         if (MOWB.rdl == IDEX.rs1)
             IDEX.stall = false; // Decode and WB can happen in same cycle (Structural soln)
-        
     }
     MOWB.stall = false;
     regFile[0].value = 0;
@@ -509,17 +512,14 @@ string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX)
 
 int main(int argc, char *argv[])
 {
-    // if (argc != 4)
-    // {
-    //     cout << "Incorrect Format\n";
-    //     return 0;
-    // }
-    // string instrFile = argv[1];
-    // string dataFile = argv[2];
-    // string cycleFile = argv[3];
-    string instrFile = "bin.txt";
-    string dataFile = "data.txt";
-    string cycleFile = "cycle.txt";
+    if (argc != 4)
+    {
+        cout << "Incorrect Format\n";
+        return 0;
+    }
+    string instrFile = argv[1];
+    string dataFile = argv[2];
+    string cycleFile = argv[3];
     string instrLine, dataLine;
     // Loading the data into program DM
     std::vector<int> DM;

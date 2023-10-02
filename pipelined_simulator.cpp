@@ -230,26 +230,20 @@ public:
     }
 };
 
-class pipelineRegister
-{
-public:
-    bool valid = false, stall = false;
-};
-
-class pc : public pipelineRegister
+class pc
 {
 public:
     int IA;
 };
 
-class ifid : public pipelineRegister
+class ifid
 {
 public:
     int instr_PC;
     string instr_reg;
 };
 
-class idex : public pipelineRegister
+class idex
 {
 public:
     int instr_PC;
@@ -260,7 +254,7 @@ public:
     idex() : CW("00000", "xxx") {}
 };
 
-class exmo : public pipelineRegister
+class exmo
 {
 public:
     Controller CW;
@@ -269,7 +263,7 @@ public:
     exmo() : CW("00000", "xxx") {}
 };
 
-class mowb : public pipelineRegister
+class mowb
 {
 public:
     Controller CW;
@@ -434,6 +428,7 @@ int main(int argc, char *argv[])
 
     // Pipeline
     auto start = std::chrono::high_resolution_clock::now();
+    auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(start - start);
 
     pc PC;
     ifid IFID;
@@ -443,16 +438,18 @@ int main(int argc, char *argv[])
     PC.IA = 0;
     while (PC.IA != numInstr * 4)
     {
+        auto cycle_start = std::chrono::high_resolution_clock::now();
         instr_fetch(IM, PC, IFID);
         instr_decode(regFile, IFID, IDEX);
         instr_execute(IDEX, EXMO, PC);
         memory_op(DM, EXMO, MOWB);
         writeback(regFile, MOWB);
-    }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    cout << "Execution time of 5-stage pipeline: " << duration.count() << " microseconds\n";
+        auto cycle_end = std::chrono::high_resolution_clock::now();
+        auto cycle_duration = std::chrono::duration_cast<std::chrono::microseconds>(cycle_end - cycle_start);
+        total_duration += cycle_duration;
+    }
+    cout << "Execution time of 5-stage pipeline (similar to single cycle): " << total_duration.count() << " microseconds\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
