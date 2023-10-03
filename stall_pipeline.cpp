@@ -374,7 +374,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
     {
         std::this_thread::sleep_for(std::chrono::microseconds(25));
         if (regFile[rsl2].instr_id == -1)
-            IDEX.rdl = regFile[rsl2].value; // for sw we need to forward rs2 somehow so we r destroying rdl bcoz it isn't needed otherwise
+            IDEX.rdl = regFile[rsl2].value; // forwarding rs2 for sw
         else
         { // Stalled
             IDEX.rs1 = rsl2;
