@@ -502,8 +502,8 @@ string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX)
             regFile[MOWB.rdl].value = MOWB.ALUres;
 
         regFile[MOWB.rdl].instr_id = -1;
-        if (MOWB.rdl == IDEX.rs1)
-            IDEX.stall = false; // Decode and WB can happen in same cycle (Structural soln)
+        if (MOWB.rdl == IDEX.rs1) // Removing stall only if that particular dependency was resolved otherwise not
+            IDEX.stall = false;   // Decode and WB can happen in same cycle (Structural soln)
     }
     MOWB.stall = false;
     regFile[0].value = 0;

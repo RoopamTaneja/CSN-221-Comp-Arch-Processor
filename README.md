@@ -14,7 +14,9 @@ The user can modify *ecall* and other auxiliary statements as per need.
 
 - A non-pipelined simulator written in C++ `simulator.cpp` that executes instructions encoded in binary format and writes back into a .txt file it uses as memory.
 
-- A 5-stage pipelined simulator written in C++ `pipelined_simulator.cpp` // DOES NOTHING AS OF NOW
+- A simulator for a 5-stage pipeline with interlocks written in C++ `stall_pipeline.cpp` that executes instructions and also writes stage description and time for each cycle.
+
+- P.S `pipelined_simulator.cpp` : Rudimentary pipeline (was too good to delete); Divides into stages but works on single instruction in a particular cycle and shows execution time
 
 ## Assembler Description and Usage Guidelines :
 
@@ -79,6 +81,23 @@ Address should from 0 and be in multiples of 4. The range of address is not rest
 Also don't have any other data or unnecessary blank lines.<br>
 
 3. The data should only be DECIMAL values.
+
+## Pipeline with Interlocks Simulator Description and Usage Guidelines :
+
+The simulator will take as arguments one .txt file containing your binary encoding of instructions, one .txt acting as memory and one .txt for outputting stage description of each cycle.
+<br><br>
+**Commands:**<br>
+After compiling `stall_pipeline.cpp`, run:
+```shell
+./<file_name>.exe <binary_file>.txt <memory_file>.txt <cycle_file>.txt
+```
+You can create your own .txt files or use the sample `bin.txt`, `data.txt` and `cycle.txt` present in the repository.<br>
+
+**Please note**:<br>
+- All ALU instructions take single cycle for execution stage in this simulator.
+- All branches are assumed *not taken*. Pipeline is flushed incase of a branch penalty.
+
+Guidelines are same as that for the simulator described earlier.
 
 ### Do have a look at `truth_table.xlsx`, it tabulates the signals which make up the control word, their meaning and the few design choices made to simplify the design.
 
