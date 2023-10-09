@@ -2,8 +2,6 @@
 
 #include <iostream>
 #include <iomanip>
-#include <chrono>
-#include <thread>
 #include <vector>
 #include <fstream>
 #include <sstream>
@@ -34,7 +32,6 @@ int dec_sign_imm(string s)
 class Controller
 {
 public:
-    int instr_id;
     bool op1Sel, op2Sel;
     string immSel, ALUop;
     bool regRead, regWrite;
@@ -59,10 +56,8 @@ public:
             immSel = "101", ALUop = "10";
     }
 
-    Controller(int pc, string op5, string f3)
+    Controller(string op5, string f3)
     {
-        instr_id = pc / 4;
-
         if (op5 == "00101")
             op1Sel = 1;
         else
@@ -263,33 +258,35 @@ public:
 class idex : public pipelineRegister
 {
 public:
-    int instr_PC;
+    int instr_PC, instr_id;
     int imm;
     Controller CW;
     int rs1, rs2, rdl;
     string ALUsel;
-    idex() : CW(-1, "00000", "xxx") {}
+    idex() : CW("00000", "xxx") {}
 };
 
 class exmo : public pipelineRegister
 {
 public:
+    int instr_PC, instr_id;
     Controller CW;
     int ALUres;
     int rs2, rdl;
-    exmo() : CW(-1, "00000", "xxx") {}
+    exmo() : CW("00000", "xxx") {}
 };
 
 class mowb : public pipelineRegister
 {
 public:
+    int instr_PC, instr_id;
     Controller CW;
     int ALUres, LDres;
     int rdl;
-    mowb() : CW(-1, "00000", "xxx") {}
+    mowb() : CW("00000", "xxx") {}
 };
 
-string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
+string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID, int &IM_access_count)
 {
     if (!PC.valid)
     {
@@ -301,7 +298,7 @@ string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
     if (IFID.stall)
         return ans;
 
-    std::this_thread::sleep_for(std::chrono::microseconds(200));
+    IM_access_count++;
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
     PC.IA += 4;
@@ -309,7 +306,7 @@ string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
     return ans;
 }
 
-string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
+string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count, int &ins_ID)
 {
     if (!IFID.valid)
     {
@@ -325,11 +322,11 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
     }
 
     IDEX.instr_PC = IFID.instr_PC;
-    std::this_thread::sleep_for(std::chrono::microseconds(250));
+    decode_count++;
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
     char f7 = IFID.instr_reg[6];
-    Controller CW(IFID.instr_PC, op5, f3);
+    Controller CW(op5, f3);
     IDEX.CW = CW;
     IDEX.ALUsel = ALUcontrol(IDEX.CW.ALUop, f3, f7);
     IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
@@ -341,7 +338,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rs1 = IDEX.instr_PC;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_read_count++;
         if (regFile[rsl1].instr_id == -1)
             IDEX.rs1 = regFile[rsl1].value;
         else
@@ -358,7 +355,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rs2 = IDEX.imm;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_read_count++;
         if (regFile[rsl2].instr_id == -1)
             IDEX.rs2 = regFile[rsl2].value;
         else
@@ -372,7 +369,7 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
     }
     if ((IDEX.CW.immSel == "010"))
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_read_count++;
         if (regFile[rsl2].instr_id == -1)
             IDEX.rdl = regFile[rsl2].value; // forwarding rs2 for sw
         else
@@ -383,19 +380,27 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX)
             IDEX.stall = true;
             return ans;
         }
+        IDEX.instr_id = ins_ID;
+        ins_ID++;
     }
     else if (IDEX.CW.immSel != "011") // lock when it's not B-type or S-type
     {
+        IDEX.instr_id = ins_ID;
+        ins_ID++;
         IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
-        regFile[IDEX.rdl].instr_id = IDEX.CW.instr_id;
+        regFile[IDEX.rdl].instr_id = IDEX.instr_id;
     }
-
+    else
+    {
+        IDEX.instr_id = ins_ID;
+        ins_ID++;
+    }
     IFID.stall = false;
     IDEX.valid = true;
     return ans;
 }
 
-string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
+string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC, int &alu_count, int &total_flushes)
 {
     if (!IDEX.valid)
     {
@@ -403,14 +408,16 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
             EXMO.valid = false;
         return "\tStage 3: -NIL-\t";
     }
-    string ans = ("\tStage 3: ins " + std::to_string(IDEX.CW.instr_id) + "\t");
+    string ans = ("\tStage 3: ins " + std::to_string(IDEX.instr_PC / 4) + "\t");
     if (EXMO.stall)
     {
         IDEX.stall = true;
         return ans;
     }
 
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    EXMO.instr_id = IDEX.instr_id;
+    EXMO.instr_PC = IDEX.instr_PC;
+    alu_count++;
     ALU aluRes;
     if (IDEX.CW.jump != "00")
     {
@@ -436,6 +443,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
         PC.valid = true;
         IFID.valid = false;
         IDEX.valid = false;
+        total_flushes++;
     }
     else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
     {
@@ -443,6 +451,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
         PC.valid = true;
         IFID.valid = false;
         IDEX.valid = false;
+        total_flushes++;
     }
 
     EXMO.ALUres = aluRes.ALUresult;
@@ -454,7 +463,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC)
     return ans;
 }
 
-string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
+string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, int &DM_read)
 {
     if (!EXMO.valid)
     {
@@ -462,20 +471,23 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
             MOWB.valid = false;
         return "\tStage 4: -NIL-\t";
     }
-    string ans = ("\tStage 4: ins " + std::to_string(EXMO.CW.instr_id) + "\t");
+    string ans = ("\tStage 4: ins " + std::to_string(EXMO.instr_PC / 4) + "\t");
     if (MOWB.stall)
     {
         EXMO.stall = true;
         return ans;
     }
+
+    MOWB.instr_id = EXMO.instr_id;
+    MOWB.instr_PC = EXMO.instr_PC;
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        DM_write++;
         DM[EXMO.ALUres / 4] = EXMO.rdl;
     }
     if (EXMO.CW.memRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        DM_read++;
         MOWB.LDres = DM[EXMO.ALUres / 4];
     }
     MOWB.CW = EXMO.CW;
@@ -486,16 +498,16 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
     return ans;
 }
 
-string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX)
+string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX, int &reg_write_count)
 {
     if (!MOWB.valid)
         return "\tStage 5: -NIL-\n";
-    string ans = "\tStage 5: ins " + std::to_string(MOWB.CW.instr_id) + "\n";
+    string ans = "\tStage 5: ins " + std::to_string(MOWB.instr_PC / 4) + "\n";
     if (MOWB.stall)
         return ans;
-    if (MOWB.CW.regWrite && regFile[MOWB.rdl].instr_id == MOWB.CW.instr_id)
+    if (MOWB.CW.regWrite && regFile[MOWB.rdl].instr_id == MOWB.instr_id)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_write_count++;
         if (MOWB.CW.mem2Reg)
             regFile[MOWB.rdl].value = MOWB.LDres;
         else
@@ -563,8 +575,9 @@ int main(int argc, char *argv[])
     }
 
     // Pipeline
-    auto start = std::chrono::high_resolution_clock::now();
-    auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(start - start);
+    int ins_ID = 0, total_stalls = 0, total_flushes = 0;
+    int IM_access_count = 0, decode_count = 0, reg_read_count = 0, alu_count = 0;
+    int DM_write = 0, DM_read = 0, reg_write_count = 0;
 
     std::vector<gpr> regFile(32, gpr());
     pc PC;
@@ -578,28 +591,40 @@ int main(int argc, char *argv[])
     std::vector<string> stage_desc;
     while (PC.valid || IFID.valid || IDEX.valid || EXMO.valid || MOWB.valid)
     {
-        auto cycle_start = std::chrono::high_resolution_clock::now();
-        outCycle << "\nCycle " << cycle_no << ": ";
+        outCycle << "\nCycle " << cycle_no << ":\n";
         if (PC.IA >= numInstr * 4)
             PC.valid = false;
-        
-        stage_desc.emplace_back(writeback(regFile, MOWB, IDEX));
-        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB));
-        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, PC));
-        stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX));
-        stage_desc.emplace_back(instr_fetch(IM, PC, IFID));
 
-        auto cycle_end = std::chrono::high_resolution_clock::now();
-        auto cycle_duration = std::chrono::duration_cast<std::chrono::microseconds>(cycle_end - cycle_start);
-        total_duration += cycle_duration;
-        outCycle << "Time = " << cycle_duration.count() << " microseconds\n";
+        stage_desc.emplace_back(writeback(regFile, MOWB, IDEX, reg_write_count));
+        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB, DM_write, DM_read));
+        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, PC, alu_count, total_flushes));
+        stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX, decode_count, reg_read_count, ins_ID));
+        stage_desc.emplace_back(instr_fetch(IM, PC, IFID, IM_access_count));
+        if (PC.stall || IFID.stall || IDEX.stall || EXMO.stall || MOWB.stall)
+            total_stalls++;
+
         for (int i = 4; i >= 0; i--)
             outCycle << stage_desc[i];
         stage_desc.clear();
         cycle_no++;
     }
     outCycle.close();
-    cout << "Execution time of 5-stage pipeline with stalls: " << total_duration.count() << " microseconds\n";
+    cout << "\nExecution statistics of 5-stage pipeline with stalls: \n";
+    cout << "\nNo of accesses of Instruction Memory accesses: " << IM_access_count << "\n";
+    cout << "No of accesses of Decode Unit: " << decode_count << "\n";
+    cout << "No of reads from Register File: " << reg_read_count << "\n";
+    cout << "No of accesses of ALU Unit: " << alu_count << "\n";
+    cout << "No of writes into Data Memory: " << DM_write << "\n";
+    cout << "No of reads from Data Memory: " << DM_read << "\n";
+    cout << "No of writes into Register File: " << reg_write_count << "\n";
+    cout << "-----------------------------------------------------------------\n";
+    cout << "No of machine-level instructions (I) = " << ins_ID << "\n";
+    cout << "Total no of stalls (data hazards) = " << total_stalls << "\n";
+    cout << "Total no of flushes (branch penalties) = " << total_flushes << "\n";
+    cout << "Total no of cycles in simulator = " << cycle_no - 1 << "\n";
+    cout << "Actual total no of cycles (if 2 stalls per branch penalty) = " << cycle_no - 1 + total_flushes << "\n";
+    cout << "Hence cycles wasted (S) = " << total_stalls + total_flushes * 2 << "\n";
+    cout << "\nCPI = " << ((float)(cycle_no - 1 + total_flushes)) / ins_ID << "\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);

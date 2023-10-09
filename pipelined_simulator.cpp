@@ -2,8 +2,6 @@
 
 #include <iostream>
 #include <iomanip>
-#include <chrono>
-#include <thread>
 #include <vector>
 #include <fstream>
 #include <sstream>
@@ -272,18 +270,18 @@ public:
     mowb() : CW("00000", "xxx") {}
 };
 
-void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
+void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID, int &IM_access_count)
 {
-    std::this_thread::sleep_for(std::chrono::microseconds(200));
+    IM_access_count++;
     IFID.instr_reg = IM[PC.IA / 4];
     IFID.instr_PC = PC.IA;
     PC.IA += 4;
 }
 
-void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
+void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count)
 {
     IDEX.instr_PC = IFID.instr_PC;
-    std::this_thread::sleep_for(std::chrono::microseconds(250));
+    decode_count++;
     string op5 = IFID.instr_reg.substr(25, 5);
     string f3 = IFID.instr_reg.substr(17, 3);
     char f7 = IFID.instr_reg[6];
@@ -301,7 +299,7 @@ void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rs1 = IDEX.instr_PC;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_read_count++;
         IDEX.rs1 = regFile[rsl1];
     }
 
@@ -309,19 +307,19 @@ void instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX)
         IDEX.rs2 = IDEX.imm;
     else
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_read_count++;
         IDEX.rs2 = regFile[rsl2];
     }
     if ((IDEX.CW.immSel == "010"))
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_read_count++;
         IDEX.rdl = regFile[rsl2];
     }
 }
 
-void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
+void instr_execute(idex &IDEX, exmo &EXMO, pc &PC, int &alu_count)
 {
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    alu_count++;
     ALU aluRes;
     if (IDEX.CW.jump != "00")
     {
@@ -352,16 +350,16 @@ void instr_execute(idex &IDEX, exmo &EXMO, pc &PC)
     EXMO.CW = IDEX.CW;
 }
 
-void memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
+void memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, int &DM_read)
 {
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        DM_write++;
         DM[EXMO.ALUres / 4] = EXMO.rdl;
     }
     if (EXMO.CW.memRead)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(200));
+        DM_read++;
         MOWB.LDres = DM[EXMO.ALUres / 4];
     }
     MOWB.CW = EXMO.CW;
@@ -369,11 +367,11 @@ void memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB)
     MOWB.rdl = EXMO.rdl;
 }
 
-void writeback(std::vector<int> &regFile, mowb &MOWB)
+void writeback(std::vector<int> &regFile, mowb &MOWB, int &reg_write_count)
 {
     if (MOWB.CW.regWrite)
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(25));
+        reg_write_count++;
         if (MOWB.CW.mem2Reg)
             regFile[MOWB.rdl] = MOWB.LDres;
         else
@@ -427,8 +425,9 @@ int main(int argc, char *argv[])
     std::vector<int> regFile(32, 0);
 
     // Pipeline
-    auto start = std::chrono::high_resolution_clock::now();
-    auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(start - start);
+    int cycle_no = 0;
+    int IM_access_count = 0, decode_count = 0, reg_read_count = 0, alu_count = 0;
+    int DM_write = 0, DM_read = 0, reg_write_count = 0;
 
     pc PC;
     ifid IFID;
@@ -438,18 +437,24 @@ int main(int argc, char *argv[])
     PC.IA = 0;
     while (PC.IA != numInstr * 4)
     {
-        auto cycle_start = std::chrono::high_resolution_clock::now();
-        instr_fetch(IM, PC, IFID);
-        instr_decode(regFile, IFID, IDEX);
-        instr_execute(IDEX, EXMO, PC);
-        memory_op(DM, EXMO, MOWB);
-        writeback(regFile, MOWB);
-
-        auto cycle_end = std::chrono::high_resolution_clock::now();
-        auto cycle_duration = std::chrono::duration_cast<std::chrono::microseconds>(cycle_end - cycle_start);
-        total_duration += cycle_duration;
+        cycle_no++;
+        instr_fetch(IM, PC, IFID, IM_access_count);
+        instr_decode(regFile, IFID, IDEX, decode_count, reg_read_count);
+        instr_execute(IDEX, EXMO, PC, alu_count);
+        memory_op(DM, EXMO, MOWB, DM_write, DM_read);
+        writeback(regFile, MOWB, reg_write_count);
     }
-    cout << "Execution time of 5-stage pipeline (similar to single cycle): " << total_duration.count() << " microseconds\n";
+
+    cout << "\nExecution statistics of 5-stage pipeline (similar to single cycle): \n";
+    cout << "\nNo of accesses of Instruction Memory accesses: " << IM_access_count << "\n";
+    cout << "No of accesses of Decode Unit: " << decode_count << "\n";
+    cout << "No of reads from Register File: " << reg_read_count << "\n";
+    cout << "No of accesses of ALU Unit: " << alu_count << "\n";
+    cout << "No of writes into Data Memory: " << DM_write << "\n";
+    cout << "No of reads from Data Memory: " << DM_read << "\n";
+    cout << "No of writes into Register File: " << reg_write_count << "\n";
+    cout << "-------------------------------------------------------------------\n";
+    cout << "Total no of cycles (I) = " << cycle_no << "\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);
