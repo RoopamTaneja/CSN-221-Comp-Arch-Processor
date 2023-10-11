@@ -1,4 +1,4 @@
-// 5-stage pipelined RISC-V processor simulator with stalls
+// 5-stage pipelined RISC-V processor simulator with operand forwarding
 
 #include <iostream>
 #include <iomanip>
@@ -228,14 +228,6 @@ public:
     }
 };
 
-class gpr
-{
-public:
-    int instr_id = -1;
-    int value = 0;
-    gpr(int id = -1, int val = 0) : instr_id(id), value(val) {}
-};
-
 class pipelineRegister
 {
 public:
@@ -258,7 +250,7 @@ public:
 class idex : public pipelineRegister
 {
 public:
-    int instr_PC, instr_id;
+    int instr_PC;
     int imm;
     Controller CW;
     int rs1, rs2;
@@ -270,17 +262,17 @@ public:
 class exmo : public pipelineRegister
 {
 public:
-    int instr_PC, instr_id;
+    int instr_PC;
     Controller CW;
     int ALUres;
-    int rs2, rdl;
+    int rsl2, rdl;
     exmo() : CW("00000", "xxx") {}
 };
 
 class mowb : public pipelineRegister
 {
 public:
-    int instr_PC, instr_id;
+    int instr_PC;
     Controller CW;
     int ALUres, LDres;
     int rdl;
@@ -290,7 +282,9 @@ public:
 bool load_use_hazard(idex &IDEX, exmo &EXMO)
 {
     string check = IDEX.CW.immSel;
-    if (check == "010" || check == "100" || check == "101") // no hazard for j-type, s-type, u-type
+    if (!EXMO.CW.memRead) // producer must be a load
+        return false;
+    if (check == "100" || check == "101") // no hazard for j-type, u-type
         return false;
     if (EXMO.rdl == IDEX.rsl1)
         return true;
@@ -298,6 +292,123 @@ bool load_use_hazard(idex &IDEX, exmo &EXMO)
         return true;
 
     return false;
+}
+
+bool rs1_hazard(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice)
+{
+    bool hazard_flag = false;
+    if (!choice)
+    {
+        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011") // no hazard if producer is b-type, s-type
+            hazard_flag = false;
+        if (EXMO.CW.memRead) // no hazard here if producer is load
+            hazard_flag = false;
+        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101") // no hazard if consumer is j-type, u-type
+            hazard_flag = false;
+        if (EXMO.rdl == IDEX.rsl1)
+            hazard_flag = true;
+    }
+    else
+    {
+        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011") // no hazard if producer is b-type, s-type
+            hazard_flag = false;
+        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101") // no hazard if consumer is j-type, u-type
+            hazard_flag = false;
+        if (MOWB.rdl == IDEX.rsl1)
+            hazard_flag = true;
+    }
+    return hazard_flag;
+}
+
+bool rs2_hazard(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice)
+{
+    bool hazard_flag = false;
+    if (!choice)
+    {
+        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011") // no hazard if producer is b-type, s-type
+            hazard_flag = false;
+        if (EXMO.CW.memRead) // no hazard here if producer is load
+            hazard_flag = false;
+        if (IDEX.CW.immSel == "001" || IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101" || IDEX.CW.immSel == "010")
+            hazard_flag = false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
+        if (EXMO.rdl == IDEX.rsl2)
+            hazard_flag = true;
+    }
+    else
+    {
+        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011") // no hazard if producer is b-type, s-type
+            hazard_flag = false;
+        if (IDEX.CW.immSel == "001" || IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101")
+            hazard_flag = false; // no hazard if consumer is j-type, u-type, i-type, load
+        if (MOWB.rdl == IDEX.rsl2)
+            hazard_flag = true;
+    }
+    return hazard_flag;
+}
+
+bool sw_rs2_hazard(exmo &EXMO, mowb &MOWB)
+{
+    bool hazard_flag = false;
+    if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011") // no hazard if producer is b-type, s-type
+        hazard_flag = false;
+    if (EXMO.CW.immSel == "010")
+        hazard_flag = false; // no hazard if consumer is not s-type
+    if (MOWB.rdl == EXMO.rsl2)
+        hazard_flag = true;
+
+    return hazard_flag;
+}
+
+int forwarder_ex(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice, int &total_forwards)
+{
+    int operand;
+    if (!choice)
+    {
+        if (rs1_hazard(IDEX, EXMO, MOWB, 0))
+        {
+            operand = EXMO.ALUres;
+            total_forwards++;
+        }
+        else if (rs1_hazard(IDEX, EXMO, MOWB, 1))
+        {
+            if (MOWB.CW.memRead)
+                operand = MOWB.LDres;
+            else
+                operand = MOWB.ALUres;
+            total_forwards++;
+        }
+        else
+            operand = IDEX.rs1;
+    }
+    else
+    {
+        if (rs2_hazard(IDEX, EXMO, MOWB, 0))
+        {
+            operand = EXMO.ALUres;
+            total_forwards++;
+        }
+        else if (rs2_hazard(IDEX, EXMO, MOWB, 1))
+        {
+            if (MOWB.CW.memRead)
+                operand = MOWB.LDres;
+            else
+                operand = MOWB.ALUres;
+            total_forwards++;
+        }
+        else
+            operand = IDEX.rs2;
+    }
+    return operand;
+}
+
+int forwarder_mo(exmo &EXMO, mowb &MOWB, int &total_forwards)
+{
+    if (sw_rs2_hazard(EXMO, MOWB))
+    {
+        total_forwards++;
+        return MOWB.LDres;
+    }
+    return EXMO.rdl;
 }
 
 string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID, int &IM_access_count)
@@ -320,7 +431,7 @@ string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID, int &IM_ac
     return ans;
 }
 
-string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count, int &ins_ID)
+string instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count)
 {
     if (!IFID.valid)
     {
@@ -345,15 +456,15 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX, int &deco
     IDEX.ALUsel = ALUcontrol(IDEX.CW.ALUop, f3, f7);
     IDEX.imm = immGen(IFID.instr_reg, CW.immSel);
 
-    int rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
-    int rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
+    IDEX.rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
+    IDEX.rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
     IDEX.rs1 = 0, IDEX.rs2 = 0;
     if (IDEX.CW.op1Sel) // auipc
         IDEX.rs1 = IDEX.instr_PC;
     else
     {
         reg_read_count++;
-        IDEX.rs1 = regFile[rsl1].value;
+        IDEX.rs1 = regFile[IDEX.rsl1];
     }
 
     if (IDEX.CW.op2Sel)
@@ -361,42 +472,23 @@ string instr_decode(std::vector<gpr> &regFile, ifid &IFID, idex &IDEX, int &deco
     else
     {
         reg_read_count++;
-        IDEX.rs2 = regFile[rsl2].value;
+        IDEX.rs2 = regFile[IDEX.rsl2];
     }
+
     if ((IDEX.CW.immSel == "010"))
     {
         reg_read_count++;
-        if (regFile[rsl2].instr_id == -1)
-            IDEX.rdl = regFile[rsl2].value; // forwarding rs2 for sw
-        else
-        { // Stalled
-            IDEX.rs1 = rsl2;
-            IFID.stall = true;
-            IDEX.valid = false;
-            IDEX.stall = true;
-            return ans;
-        }
-        IDEX.instr_id = ins_ID;
-        ins_ID++;
-    }
-    else if (IDEX.CW.immSel != "011") // lock when it's not B-type or S-type
-    {
-        IDEX.instr_id = ins_ID;
-        ins_ID++;
-        IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
-        regFile[IDEX.rdl].instr_id = IDEX.instr_id;
+        IDEX.rdl = regFile[IDEX.rsl2]; // forwarding rs2 for sw
     }
     else
-    {
-        IDEX.instr_id = ins_ID;
-        ins_ID++;
-    }
+        IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+
     IFID.stall = false;
     IDEX.valid = true;
     return ans;
 }
 
-string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC, int &alu_count, int &total_flushes)
+string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &MOWB, pc &PC, int &alu_count, int &total_stalls, int &total_flushes, int &total_forwards)
 {
     if (!IDEX.valid)
     {
@@ -405,26 +497,27 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC, int &alu_count,
         return "\tStage 3: -NIL-\t";
     }
     string ans = ("\tStage 3: ins " + std::to_string(IDEX.instr_PC / 4) + "\t");
-    if (EXMO.stall)
+    if (load_use_hazard(IDEX, EXMO))
     {
+        total_stalls++;
         IDEX.stall = true;
+        EXMO.valid = false;
+        EXMO.stall = true;
         return ans;
     }
+    if (EXMO.stall)         // stalling for only one cycle
+        IDEX.stall = false; // so if already stalled => now you can remove stall
 
-    EXMO.instr_id = IDEX.instr_id;
-    EXMO.instr_PC = IDEX.instr_PC;
     alu_count++;
-    ALU aluRes;
+    int ALU_inp1, ALU_inp2;
     if (IDEX.CW.jump != "00")
-    {
-        ALU res(IDEX.ALUsel, IDEX.instr_PC, 4);
-        aluRes = res;
-    }
+        ALU_inp1 = IDEX.instr_PC, ALU_inp2 = 4;
     else
     {
-        ALU res(IDEX.ALUsel, IDEX.rs1, IDEX.rs2);
-        aluRes = res;
+        ALU_inp1 = forwarder_ex(IDEX, EXMO, MOWB, 0, total_forwards);
+        ALU_inp2 = forwarder_ex(IDEX, EXMO, MOWB, 1, total_forwards);
     }
+    ALU aluRes(IDEX.ALUsel, ALU_inp1, ALU_inp2);
 
     int JPC;
     if (IDEX.CW.jump == "01") // jal
@@ -449,9 +542,9 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC, int &alu_count,
         IDEX.valid = false;
         total_flushes++;
     }
-
+    EXMO.instr_PC = IDEX.instr_PC;
     EXMO.ALUres = aluRes.ALUresult;
-    EXMO.rs2 = IDEX.rs2;
+    EXMO.rsl2 = IDEX.rsl2;
     EXMO.rdl = IDEX.rdl;
     EXMO.CW = IDEX.CW;
     IDEX.stall = false;
@@ -459,7 +552,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC, int &alu_count,
     return ans;
 }
 
-string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, int &DM_read)
+string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, int &DM_read, int &total_forwards)
 {
     if (!EXMO.valid)
     {
@@ -474,18 +567,18 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, in
         return ans;
     }
 
-    MOWB.instr_id = EXMO.instr_id;
-    MOWB.instr_PC = EXMO.instr_PC;
+    int mem_inp = forwarder_mo(EXMO, MOWB, total_forwards);
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
         DM_write++;
-        DM[EXMO.ALUres / 4] = EXMO.rdl;
+        DM[EXMO.ALUres / 4] = mem_inp;
     }
     if (EXMO.CW.memRead)
     {
         DM_read++;
         MOWB.LDres = DM[EXMO.ALUres / 4];
     }
+    MOWB.instr_PC = EXMO.instr_PC;
     MOWB.CW = EXMO.CW;
     MOWB.ALUres = EXMO.ALUres;
     MOWB.rdl = EXMO.rdl;
@@ -494,27 +587,24 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, in
     return ans;
 }
 
-string writeback(std::vector<gpr> &regFile, mowb &MOWB, idex &IDEX, int &reg_write_count)
+string writeback(std::vector<int> &regFile, mowb &MOWB, int &reg_write_count, int &instr_count)
 {
     if (!MOWB.valid)
         return "\tStage 5: -NIL-\n";
     string ans = "\tStage 5: ins " + std::to_string(MOWB.instr_PC / 4) + "\n";
     if (MOWB.stall)
         return ans;
-    if (MOWB.CW.regWrite && regFile[MOWB.rdl].instr_id == MOWB.instr_id)
+    if (MOWB.CW.regWrite)
     {
         reg_write_count++;
         if (MOWB.CW.mem2Reg)
-            regFile[MOWB.rdl].value = MOWB.LDres;
+            regFile[MOWB.rdl] = MOWB.LDres;
         else
-            regFile[MOWB.rdl].value = MOWB.ALUres;
-
-        regFile[MOWB.rdl].instr_id = -1;
-        if (MOWB.rdl == IDEX.rs1) // Removing stall only if that particular dependency was resolved otherwise not
-            IDEX.stall = false;   // Decode and WB can happen in same cycle (Structural soln)
+            regFile[MOWB.rdl] = MOWB.ALUres;
     }
     MOWB.stall = false;
-    regFile[0].value = 0;
+    regFile[0] = 0;
+    instr_count++;
     return ans;
 }
 
@@ -571,11 +661,11 @@ int main(int argc, char *argv[])
     }
 
     // Pipeline
-    int ins_ID = 0, total_stalls = 0, total_flushes = 0;
+    int instr_count = 0, total_stalls = 0, total_flushes = 0, total_forwards = 0;
     int IM_access_count = 0, decode_count = 0, reg_read_count = 0, alu_count = 0;
     int DM_write = 0, DM_read = 0, reg_write_count = 0;
 
-    std::vector<gpr> regFile(32, gpr());
+    std::vector<int> regFile(32, 0);
     pc PC;
     ifid IFID;
     idex IDEX;
@@ -591,13 +681,11 @@ int main(int argc, char *argv[])
         if (PC.IA >= numInstr * 4)
             PC.valid = false;
 
-        stage_desc.emplace_back(writeback(regFile, MOWB, IDEX, reg_write_count));
-        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB, DM_write, DM_read));
-        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, PC, alu_count, total_flushes));
-        stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX, decode_count, reg_read_count, ins_ID));
+        stage_desc.emplace_back(writeback(regFile, MOWB, reg_write_count, instr_count));
+        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB, DM_write, DM_read, total_forwards));
+        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, MOWB, PC, alu_count, total_stalls, total_flushes, total_forwards));
+        stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX, decode_count, reg_read_count));
         stage_desc.emplace_back(instr_fetch(IM, PC, IFID, IM_access_count));
-        if (PC.stall || IFID.stall || IDEX.stall || EXMO.stall || MOWB.stall)
-            total_stalls++;
 
         for (int i = 4; i >= 0; i--)
             outCycle << stage_desc[i];
@@ -605,7 +693,7 @@ int main(int argc, char *argv[])
         cycle_no++;
     }
     outCycle.close();
-    cout << "\nExecution statistics of 5-stage pipeline with stalls: \n";
+    cout << "\nExecution statistics of 5-stage pipeline with operand forwarding: \n";
     cout << "\nNo of accesses of Instruction Memory accesses: " << IM_access_count << "\n";
     cout << "No of accesses of Decode Unit: " << decode_count << "\n";
     cout << "No of reads from Register File: " << reg_read_count << "\n";
@@ -614,13 +702,14 @@ int main(int argc, char *argv[])
     cout << "No of reads from Data Memory: " << DM_read << "\n";
     cout << "No of writes into Register File: " << reg_write_count << "\n";
     cout << "-----------------------------------------------------------------\n";
-    cout << "No of machine-level instructions (I) = " << ins_ID << "\n";
-    cout << "Total no of stalls (data hazards) = " << total_stalls << "\n";
+    cout << "No of machine-level instructions (I) = " << instr_count << "\n";
+    cout << "Total no of forwards (data hazards) = " << total_forwards << "\n";
+    cout << "Total no of stalls (load use hazards) = " << total_stalls << "\n";
     cout << "Total no of flushes (branch penalties) = " << total_flushes << "\n";
     cout << "Total no of cycles in simulator = " << cycle_no - 1 << "\n";
     cout << "Actual total no of cycles (if 2 stalls per branch penalty) = " << cycle_no - 1 + total_flushes << "\n";
     cout << "Hence cycles wasted (S) = " << total_stalls + total_flushes * 2 << "\n";
-    cout << "\nCPI = " << ((float)(cycle_no - 1 + total_flushes)) / ins_ID << "\n";
+    cout << "\nCPI = " << ((float)(cycle_no - 1 + total_flushes)) / instr_count << "\n";
 
     // Printing back the data from DM
     std::ofstream outData(dataFile, std::ios::trunc);

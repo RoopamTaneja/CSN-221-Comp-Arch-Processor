@@ -272,7 +272,7 @@ public:
     int instr_PC, instr_id;
     Controller CW;
     int ALUres;
-    int rs2, rdl;
+    int rdl;
     exmo() : CW("00000", "xxx") {}
 };
 
@@ -455,7 +455,6 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, pc &PC, int &alu_count,
     }
 
     EXMO.ALUres = aluRes.ALUresult;
-    EXMO.rs2 = IDEX.rs2;
     EXMO.rdl = IDEX.rdl;
     EXMO.CW = IDEX.CW;
     IDEX.stall = false;

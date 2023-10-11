@@ -257,7 +257,7 @@ class exmo
 public:
     Controller CW;
     int ALUres;
-    int rs2, rdl;
+    int rdl;
     exmo() : CW("00000", "xxx") {}
 };
 
@@ -345,7 +345,6 @@ void instr_execute(idex &IDEX, exmo &EXMO, pc &PC, int &alu_count)
         PC.IA = BPC;
 
     EXMO.ALUres = aluRes.ALUresult;
-    EXMO.rs2 = IDEX.rs2;
     EXMO.rdl = IDEX.rdl;
     EXMO.CW = IDEX.CW;
 }
