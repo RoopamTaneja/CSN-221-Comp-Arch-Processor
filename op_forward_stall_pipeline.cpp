@@ -282,14 +282,14 @@ public:
 bool load_use_hazard(idex &IDEX, exmo &EXMO)
 {
     string check = IDEX.CW.immSel;
-    if (!EXMO.CW.memRead) // producer must be a load
-        return false;
-    if (check == "100" || check == "101") // no hazard for j-type, u-type
-        return false;
+    if (!EXMO.CW.memRead)
+        return false; // producer must be a load
+    if (check == "100" || check == "101")
+        return false; // no hazard for j-type, u-type
     if (EXMO.rdl == IDEX.rsl1)
         return true;
-    if ((check == "000" || check == "011") && (EXMO.rdl == IDEX.rsl2)) // rsl2 dep for r-type, b-type
-        return true;
+    if ((check == "000" || check == "011") && (EXMO.rdl == IDEX.rsl2))
+        return true; // rsl2 dep for r-type, b-type
 
     return false;
 }
@@ -299,21 +299,21 @@ bool rs1_hazard(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice)
     bool hazard_flag = false;
     if (!choice)
     {
-        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011") // no hazard if producer is b-type, s-type
-            hazard_flag = false;
-        if (EXMO.CW.memRead) // no hazard here if producer is load
-            hazard_flag = false;
-        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101") // no hazard if consumer is j-type, u-type
-            hazard_flag = false;
+        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (EXMO.CW.memRead)
+            return false; // no hazard here if producer is load
+        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101")
+            return false; // no hazard if consumer is j-type, u-type
         if (EXMO.rdl == IDEX.rsl1)
             hazard_flag = true;
     }
     else
     {
-        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011") // no hazard if producer is b-type, s-type
-            hazard_flag = false;
-        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101") // no hazard if consumer is j-type, u-type
-            hazard_flag = false;
+        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101")
+            return false; // no hazard if consumer is j-type, u-type
         if (MOWB.rdl == IDEX.rsl1)
             hazard_flag = true;
     }
@@ -325,21 +325,22 @@ bool rs2_hazard(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice)
     bool hazard_flag = false;
     if (!choice)
     {
-        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011") // no hazard if producer is b-type, s-type
-            hazard_flag = false;
-        if (EXMO.CW.memRead) // no hazard here if producer is load
-            hazard_flag = false;
+        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (EXMO.CW.memRead)
+            return false; // no hazard here if producer is load
         if (IDEX.CW.immSel == "001" || IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101" || IDEX.CW.immSel == "010")
-            hazard_flag = false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
+            return false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
         if (EXMO.rdl == IDEX.rsl2)
             hazard_flag = true;
     }
     else
     {
-        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011") // no hazard if producer is b-type, s-type
-            hazard_flag = false;
-        if (IDEX.CW.immSel == "001" || IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101" || IDEX.CW.immSel == "010")
-            hazard_flag = false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
+        string check = IDEX.CW.immSel;
+        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (check == "001" || check == "100" || check == "101" || check == "010")
+            return false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
         if (MOWB.rdl == IDEX.rsl2)
             hazard_flag = true;
     }
@@ -391,10 +392,10 @@ int forwarder_ex(idex &IDEX, exmo &EXMO, mowb &MOWB, int &t1_forwards, int &t2_f
 bool sw_rs2_hazard(exmo &EXMO, mowb &MOWB)
 {
     bool hazard_flag = false;
-    if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011") // no hazard if producer is b-type, s-type
-        hazard_flag = false;
+    if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011")
+        return false; // no hazard if producer is b-type, s-type
     if (EXMO.CW.immSel != "010")
-        hazard_flag = false; // no hazard if consumer is not s-type
+        return false; // no hazard if consumer is not s-type
     if (MOWB.rdl == EXMO.rsl2)
         hazard_flag = true;
 
@@ -433,7 +434,7 @@ string instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID, int &IM_ac
     return ans;
 }
 
-string instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count)
+string instr_decode(int regFile[], ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count)
 {
     if (!IFID.valid)
     {
@@ -490,7 +491,7 @@ string instr_decode(std::vector<int> &regFile, ifid &IFID, idex &IDEX, int &deco
     return ans;
 }
 
-string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &MOWB, pc &PC, int &alu_count, int &total_stalls, int &total_flushes, int &t1_forwards, int &t2_forwards)
+string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &old_MOWB, pc &PC, int &alu_count, int &total_stalls, int &total_flushes, int &t1_forwards, int &t2_forwards)
 {
     if (!IDEX.valid)
     {
@@ -499,7 +500,10 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &MOWB, pc &PC, int
         return "\tStage 3: -NIL-\t";
     }
     string ans = ("\tStage 3: ins " + std::to_string(IDEX.instr_PC / 4) + "\t");
-    if (load_use_hazard(IDEX, EXMO))
+    if (EXMO.stall)         // stalling for only one cycle
+        IDEX.stall = false; // so if already stalled => now you can remove stall
+
+    else if (load_use_hazard(IDEX, EXMO))
     {
         total_stalls++;
         IDEX.stall = true;
@@ -507,8 +511,6 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &MOWB, pc &PC, int
         EXMO.stall = true;
         return ans;
     }
-    if (EXMO.stall)         // stalling for only one cycle
-        IDEX.stall = false; // so if already stalled => now you can remove stall
 
     alu_count++;
     int ALU_inp1, ALU_inp2;
@@ -516,8 +518,8 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &MOWB, pc &PC, int
         ALU_inp1 = IDEX.instr_PC, ALU_inp2 = 4;
     else
     { // 0 - inp1; 1 - inp2
-        ALU_inp1 = forwarder_ex(IDEX, EXMO, MOWB, t1_forwards, t2_forwards, 0);
-        ALU_inp2 = forwarder_ex(IDEX, EXMO, MOWB, t1_forwards, t2_forwards, 1);
+        ALU_inp1 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 0);
+        ALU_inp2 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 1);
     }
     ALU aluRes(IDEX.ALUsel, ALU_inp1, ALU_inp2);
 
@@ -554,8 +556,10 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &MOWB, pc &PC, int
     return ans;
 }
 
-string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, int &DM_read, int &t3_forwards)
+string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, mowb &old_MOWB, int &DM_write, int &DM_read, int &t3_forwards)
 {
+    if (MOWB.valid)
+        old_MOWB = MOWB;
     if (!EXMO.valid)
     {
         if (!MOWB.stall)
@@ -568,7 +572,6 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, in
         EXMO.stall = true;
         return ans;
     }
-
     int mem_inp = forwarder_mo(EXMO, MOWB, t3_forwards);
     if (EXMO.CW.memWrite && EXMO.CW.regRead)
     {
@@ -589,7 +592,7 @@ string memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, int &DM_write, in
     return ans;
 }
 
-string writeback(std::vector<int> &regFile, mowb &MOWB, int &reg_write_count, int &instr_count)
+string writeback(int regFile[], mowb &MOWB, int &reg_write_count, int &instr_count)
 {
     if (!MOWB.valid)
         return "\tStage 5: -NIL-\n";
@@ -668,12 +671,12 @@ int main(int argc, char *argv[])
     int IM_access_count = 0, decode_count = 0, reg_read_count = 0, alu_count = 0;
     int DM_write = 0, DM_read = 0, reg_write_count = 0;
 
-    std::vector<int> regFile(32, 0);
+    int regFile[32] = {0};
     pc PC;
     ifid IFID;
     idex IDEX;
     exmo EXMO;
-    mowb MOWB;
+    mowb MOWB, old_MOWB;
     PC.valid = true;
     PC.IA = 0;
     int cycle_no = 1;
@@ -685,8 +688,8 @@ int main(int argc, char *argv[])
             PC.valid = false;
 
         stage_desc.emplace_back(writeback(regFile, MOWB, reg_write_count, instr_count));
-        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB, DM_write, DM_read, t3_forwards));
-        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, MOWB, PC, alu_count, total_stalls, total_flushes, t1_forwards, t2_forwards));
+        stage_desc.emplace_back(memory_op(DM, EXMO, MOWB, old_MOWB, DM_write, DM_read, t3_forwards));
+        stage_desc.emplace_back(instr_execute(IDEX, EXMO, IFID, old_MOWB, PC, alu_count, total_stalls, total_flushes, t1_forwards, t2_forwards));
         stage_desc.emplace_back(instr_decode(regFile, IFID, IDEX, decode_count, reg_read_count));
         stage_desc.emplace_back(instr_fetch(IM, PC, IFID, IM_access_count));
 

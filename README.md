@@ -14,7 +14,10 @@ The user can modify *ecall* and other auxiliary statements as per need.
 
 - A non-pipelined simulator written in C++ `simulator.cpp` that executes instructions encoded in binary format and writes back into a .txt file it uses as memory.
 
-- A simulator for a 5-stage pipeline with interlocks written in C++ `stall_pipeline.cpp` that executes instructions and also writes stage description and time for each cycle.
+- A simulator for a 5-stage pipeline with **interlocks** written in C++ `stall_pipeline.cpp` that executes instructions and also writes stage description and time for each cycle and also prints execution statistics like number of stalls and flushes.
+
+- A simulator for a 5-stage pipeline with **operand forwarding** written in C++ `op_forward_stall_pipeline.cpp` that executes instructions and also writes stage description and time for each cycle and also prints execution statistics like number of forwards, stalls and flushes.<br>
+  NOTE: load-use hazards have also been taken care of.
 
 - P.S `pipelined_simulator.cpp` : Rudimentary pipeline (was too good to delete); Divides into stages but works on single instruction in a particular cycle and shows execution time
 
@@ -99,10 +102,33 @@ You can create your own .txt files or use the sample `bin.txt`, `data.txt` and `
 
 Guidelines are same as that for the simulator described earlier.
 
+## Pipeline with Operand Forwarding Simulator Description and Usage Guidelines :
+
+The simulator will take as arguments one .txt file containing your binary encoding of instructions, one .txt acting as memory and one .txt for outputting stage description of each cycle.
+<br><br>
+**Commands:**<br>
+After compiling `op_forward_stall_pipeline.cpp`, run:
+```shell
+./<file_name>.exe <binary_file>.txt <memory_file>.txt <cycle_file>.txt
+```
+You can create your own .txt files or use the sample `bin.txt`, `data.txt` and `cycle.txt` present in the repository.<br>
+
+**Please note**:<br>
+- Types of operand forwarding paths:
+  1. EXMO to EX stage
+  2. MOWB to EX stage
+  3. MOWB to MO stage<br>
+  NOTE: Store instructions receive their second operand exclusively via MOWB to MO path. No other instruction can use that path.
+- Load-use hazards have also been taken care of.
+- All ALU instructions take single cycle for execution stage in this simulator.
+- All branches are assumed *not taken*. Pipeline is flushed incase of a branch penalty.
+
+Guidelines are same as that for the simulator described earlier.
+
 ### Do have a look at `truth_table.xlsx`, it tabulates the signals which make up the control word, their meaning and the few design choices made to simplify the design.
 
-The attempt has been to make the assembler and simulator as scalable and extendable as possible.<br>
-It should not be tough to add more RV32I instructions or pseudo instructions in future once you get a hang of the code. Scaling the assembler is comparatively easier than the simulator for which you may need to analyse and modify the `truth_table.xlsx`.
+The attempt has been to make the assembler and simulators as scalable and extendable as possible.<br>
+It should not be tough to add more RV32I instructions or pseudo instructions in future once you get a hang of the code. Scaling the assembler is comparatively easier than the simulators for which you may need to analyse and modify the `truth_table.xlsx`.
 
 ### GUI :
 Not sure if I will make the GUI. Even if I don't, this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
