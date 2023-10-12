@@ -500,11 +500,14 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &old_MOWB, pc &PC,
         return "\tStage 3: -NIL-\t";
     }
     string ans = ("\tStage 3: ins " + std::to_string(IDEX.instr_PC / 4) + "\t");
-    if (EXMO.stall)         // stalling for only one cycle
-        IDEX.stall = false; // so if already stalled => now you can remove stall
 
-    else if (load_use_hazard(IDEX, EXMO))
+    if (!EXMO.stall && load_use_hazard(IDEX, EXMO)) // stalling for only one cycle
     {
+        if (IDEX.CW.jump == "00")
+        { // 0 - inp1; 1 - inp2
+            IDEX.rs1 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 0);
+            IDEX.rs2 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 1);
+        }
         total_stalls++;
         IDEX.stall = true;
         EXMO.valid = false;
