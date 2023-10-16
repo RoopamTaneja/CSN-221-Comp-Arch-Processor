@@ -130,6 +130,32 @@ Guidelines are same as that for the simulator described earlier.
 The attempt has been to make the assembler and simulators as scalable and extendable as possible.<br>
 It should not be tough to add more RV32I instructions or pseudo instructions in future once you get a hang of the code. Scaling the assembler is comparatively easier than the simulators for which you may need to analyse and modify the `truth_table.xlsx`.
 
+### Comparative Study :
+
+#### Identifying if a given no is prime: 
+Input : 2099 ; Output : 1 (True)
+| Pipeline Type           | # Stalls (Data Hazards) | # Forwards (# Load-Use Hazards) | # Flushes (Branch Penalties) | Total Cycles | I     | S     | CPI (k=5) |
+| ----------------------- | ----------------------- | ------------------------------- | ---------------------------- | ------------ | ----- | ----- | --------- |
+| Non-pipelined           | NA                      | NA                              | NA                           | 10494        | 10494 | NA    | 1         |
+| With stalls             | 4203                    | NA                              | 4195                         | 23091        | 10494 | 12593 | 2.2004    |
+| With operand forwarding | NA                      | 2102 (0)                        | 4195                         | 18888        | 10494 | 8390  | 1.79989   |
+
+#### Finding factorial of a given no:
+Input : 12 ; Output : 479001600
+| Pipeline Type           | # Stalls (Data Hazards) | # Forwards (# Load-Use Hazards) | # Flushes (Branch Penalties) | Total Cycles | I   | S   | CPI (k=5) |
+| ----------------------- | ----------------------- | ------------------------------- | ---------------------------- | ------------ | --- | --- | --------- |
+| Non-pipelined           | NA                      | NA                              | NA                           | 55           | 55  | NA  | 1         |
+| With stalls             | 6                       | NA                              | 13                           | 91           | 55  | 32  | 1.65455   |
+| With operand forwarding | NA                      | 4 (0)                           | 13                           | 85           | 55  | 26  | 1.54545   |
+
+#### Finding GCD and LCM of two given nos:
+Input : 9305 & 4300 ; Output : GCD = 5 & LCM = 8002300
+| Pipeline Type           | # Stalls (Data Hazards) | # Forwards (# Load-Use Hazards) | # Flushes (Branch Penalties) | Total Cycles | I     | S     | CPI (k=5) |
+| ----------------------- | ----------------------- | ------------------------------- | ---------------------------- | ------------ | ----- | ----- | --------- |
+| Non-pipelined           | NA                      | NA                              | NA                           | 38673        | 38673 | NA    | 1         |
+| With stalls             | 38672                   | NA                              | 4297                         | 85943        | 38673 | 47266 | 2.2223    |
+| With operand forwarding | NA                      | 21488 (2)                       | 4297                         | 47273        | 38673 | 8596  | 1.22238   |
+
 ### GUI :
 Not sure if I will make the GUI. Even if I don't, this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
 **Webpage** : https://luplab.gitlab.io/rvcodecjs/<br> 

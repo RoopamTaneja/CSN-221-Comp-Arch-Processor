@@ -539,6 +539,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &old_MOWB, pc &PC,
         PC.valid = true;
         IFID.valid = false;
         IDEX.valid = false;
+        IFID.stall = false;
         total_flushes++;
     }
     else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
@@ -547,6 +548,7 @@ string instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &old_MOWB, pc &PC,
         PC.valid = true;
         IFID.valid = false;
         IDEX.valid = false;
+        IFID.stall = false;
         total_flushes++;
     }
     EXMO.instr_PC = IDEX.instr_PC;
