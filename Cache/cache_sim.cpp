@@ -2,7 +2,6 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include <bitset>
 using std::cout, std::cin, std::string, std::vector;
 
 struct trace_data
@@ -11,6 +10,7 @@ struct trace_data
     long long address;
     int data;
 };
+
 class CPUreq
 {
 public:
@@ -25,6 +25,7 @@ public:
         offset = trace.address & offset_mask;
         index = (trace.address >> offset_size) & index_mask;
         tag = trace.address >> (index_size + offset_size);
+        data = trace.data;
     }
 };
 
@@ -38,21 +39,29 @@ public:
     {
         valid_bit = 0;
         dirty_bit = 0;
-        tag = 0;
+        tag = -1;
         data_block.assign(block_size, 0);
     }
 };
 
+cache_block replace(vector<int> memResp, CPUreq newRequest, int block_size)
+{
+    // direct mapped
+    cache_block newBlock(block_size);
+    newBlock.tag = newRequest.tag;
+    newBlock.data_block = memResp;
+    return newBlock;
+}
+
 int main(int argc, char *argv[])
 {
-    if (argc != 4)
+    if (argc != 3)
     {
         cout << "Incorrect Format\n";
         return 0;
     }
     string traceFile = argv[1];
     string paramsFile = argv[2];
-    string statsFile = argv[3];
 
     // Main Memory Initialization
     int main_memory[1000000];
@@ -74,7 +83,7 @@ int main(int argc, char *argv[])
         params.push_back(stoi(tokens[1]));
     }
     inParams.close();
-    int cache_size = params[0];
+    int cache_size = params[0] * 1024 / 4;
     int ways = params[1];
     int block_size = params[2] / 4;
     string rep_policy = "LRU (Least Recently Used)";
@@ -118,25 +127,51 @@ int main(int argc, char *argv[])
         CPUreq newRequest(trace, offset_size, offset_mask, index_size, index_mask);
         int CPUresp;
         cache_block block = cache[newRequest.index];
-        if (!block.valid_bit)
+
+        if (block.tag == newRequest.tag) // hit
         {
-            // miss
-            for (int i = 0; i < block_size; i++)
-                block.data_block[i] = main_memory[trace.address / 4 + i];
-            block.valid_bit = 1;
-            block.tag = newRequest.tag;
-        }
-        else
-        {
-            if (block.tag == newRequest.tag)
-            { // hit
-                CPUresp = block.data_block[newRequest.offset];
-            }
+            hits++;
+            if (!newRequest.read_write) // read
+                CPUresp = block.data_block[newRequest.offset], reads++;
             else
+            { // write
+                block.data_block[newRequest.offset] = newRequest.data;
+                block.valid_bit = 1;
+                block.dirty_bit = 1;
+                writes++;
+            }
+        }
+        else // miss
+        {
+            misses++;
+            // evict
+            if (block.valid_bit && block.dirty_bit)
             {
+                long long addr = block.tag << (index_size + offset_size);
+                addr += newRequest.index << (offset_size);
                 for (int i = 0; i < block_size; i++)
-                    block.data_block[i] = main_memory[trace.address / 4 + i];
-                block.tag = newRequest.tag;
+                    main_memory[addr + i] = block.data_block[i];
+            }
+            // memRead
+            vector<int> memResp;
+            for (int i = 0; i < block_size; i++)
+                memResp.emplace_back(main_memory[trace.address / 4 + i]);
+            // replace
+            block = replace(memResp, newRequest, block_size);
+            cache[newRequest.index] = block;
+            if (!newRequest.read_write) // read
+            {
+                CPUresp = block.data_block[newRequest.offset];
+                block.valid_bit = 1;
+                block.dirty_bit = 0;
+                reads++;
+            }
+            else // write
+            {
+                block.data_block[newRequest.offset] = newRequest.data;
+                block.valid_bit = 1;
+                block.dirty_bit = 1;
+                writes++;
             }
         }
     }
@@ -148,5 +183,9 @@ int main(int argc, char *argv[])
     cout << "Replacement policy : " << rep_policy << "\n";
     cout << "Write policy : " << write_policy << "\n";
     cout << "Trace Name : " << traceFile << "\n";
+    cout << "No of hits : " << hits << "\n";
+    cout << "No of misses : " << misses << "\n";
+    cout << "No of reads : " << reads << "\n";
+    cout << "No of writes : " << writes << "\n";
     return 0;
 }
