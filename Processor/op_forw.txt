@@ -1,0 +1,282 @@
+bool load_use_hazard(idex &IDEX, exmo &EXMO)
+{
+    string check = IDEX.CW.immSel;
+    if (!EXMO.CW.memRead)
+        return false; // producer must be a load
+    if (check == "100" || check == "101")
+        return false; // no hazard for j-type, u-type
+    if (EXMO.rdl == IDEX.rsl1)
+        return true;
+    if ((check == "000" || check == "011") && (EXMO.rdl == IDEX.rsl2))
+        return true; // rsl2 dep for r-type, b-type
+
+    return false;
+}
+
+bool rs1_hazard(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice)
+{
+    bool hazard_flag = false;
+    if (!choice)
+    {
+        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (EXMO.CW.memRead)
+            return false; // no hazard here if producer is load
+        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101")
+            return false; // no hazard if consumer is j-type, u-type
+        if (EXMO.rdl == IDEX.rsl1)
+            hazard_flag = true;
+    }
+    else
+    {
+        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101")
+            return false; // no hazard if consumer is j-type, u-type
+        if (MOWB.rdl == IDEX.rsl1)
+            hazard_flag = true;
+    }
+    return hazard_flag;
+}
+
+bool rs2_hazard(idex &IDEX, exmo &EXMO, mowb &MOWB, bool choice)
+{
+    bool hazard_flag = false;
+    if (!choice)
+    {
+        if (EXMO.CW.immSel == "010" || EXMO.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (EXMO.CW.memRead)
+            return false; // no hazard here if producer is load
+        if (IDEX.CW.immSel == "001" || IDEX.CW.immSel == "100" || IDEX.CW.immSel == "101" || IDEX.CW.immSel == "010")
+            return false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
+        if (EXMO.rdl == IDEX.rsl2)
+            hazard_flag = true;
+    }
+    else
+    {
+        string check = IDEX.CW.immSel;
+        if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011")
+            return false; // no hazard if producer is b-type, s-type
+        if (check == "001" || check == "100" || check == "101" || check == "010")
+            return false; // no hazard if consumer is j-type, u-type, i-type, load, s-type
+        if (MOWB.rdl == IDEX.rsl2)
+            hazard_flag = true;
+    }
+    return hazard_flag;
+}
+
+int forwarder_ex(idex &IDEX, exmo &EXMO, mowb &MOWB, int &t1_forwards, int &t2_forwards, bool choice)
+{ // 0 - EXMO forward, 1 - MOWB forward
+    int operand;
+    if (!choice)
+    {
+        if (rs1_hazard(IDEX, EXMO, MOWB, 0))
+        { // prefer EXMO forward
+            operand = EXMO.ALUres;
+            t1_forwards++;
+        }
+        else if (rs1_hazard(IDEX, EXMO, MOWB, 1))
+        {
+            if (MOWB.CW.memRead)
+                operand = MOWB.LDres;
+            else
+                operand = MOWB.ALUres;
+            t2_forwards++;
+        }
+        else
+            operand = IDEX.rs1;
+    }
+    else
+    {
+        if (rs2_hazard(IDEX, EXMO, MOWB, 0))
+        { // prefer EXMO forward
+            operand = EXMO.ALUres;
+            t1_forwards++;
+        }
+        else if (rs2_hazard(IDEX, EXMO, MOWB, 1))
+        {
+            if (MOWB.CW.memRead)
+                operand = MOWB.LDres;
+            else
+                operand = MOWB.ALUres;
+            t2_forwards++;
+        }
+        else
+            operand = IDEX.rs2;
+    }
+    return operand;
+}
+
+bool sw_rs2_hazard(exmo &EXMO, mowb &MOWB)
+{
+    bool hazard_flag = false;
+    if (MOWB.CW.immSel == "010" || MOWB.CW.immSel == "011")
+        return false; // no hazard if producer is b-type, s-type
+    if (EXMO.CW.immSel != "010")
+        return false; // no hazard if consumer is not s-type
+    if (MOWB.rdl == EXMO.rsl2)
+        hazard_flag = true;
+
+    return hazard_flag;
+}
+
+int forwarder_mo(exmo &EXMO, mowb &MOWB, int &t3_forwards)
+{
+    if (sw_rs2_hazard(EXMO, MOWB))
+    {
+        t3_forwards++;
+        if (MOWB.CW.memRead)
+            return MOWB.LDres;
+        return MOWB.ALUres;
+    }
+    return EXMO.rdl;
+}
+
+void instr_fetch(const std::vector<string> &IM, pc &PC, ifid &IFID)
+{
+    if (!PC.valid)
+    {
+        if (!IFID.stall)
+            IFID.valid = false;
+        return;
+    }
+    if (IFID.stall)
+        return;
+
+    // IFID writing and PC update
+    IFID.valid = true;
+}
+
+void instr_decode(int regFile[], ifid &IFID, idex &IDEX, int &decode_count, int &reg_read_count)
+{
+    if (!IFID.valid)
+    {
+        if (!IDEX.stall)
+            IDEX.valid = false;
+        return;
+    }
+    if (IDEX.stall)
+    {
+        IFID.stall = true;
+        return;
+    }
+    // IDEX writing
+
+    IDEX.rsl1 = stoi(IFID.instr_reg.substr(12, 5), NULL, 2);
+    IDEX.rsl2 = stoi(IFID.instr_reg.substr(7, 5), NULL, 2);
+    IDEX.rs1 = 0, IDEX.rs2 = 0;
+    if (IDEX.CW.op1Sel) // auipc
+        IDEX.rs1 = IDEX.instr_PC;
+    else
+        IDEX.rs1 = regFile[IDEX.rsl1];
+
+    if (IDEX.CW.op2Sel)
+        IDEX.rs2 = IDEX.imm;
+    else
+        IDEX.rs2 = regFile[IDEX.rsl2];
+
+    if ((IDEX.CW.immSel == "010"))
+        IDEX.rdl = regFile[IDEX.rsl2]; // forwarding rs2 for sw
+    else
+        IDEX.rdl = stoi(IFID.instr_reg.substr(20, 5), NULL, 2);
+
+    IFID.stall = false;
+    IDEX.valid = true;
+}
+
+void instr_execute(idex &IDEX, exmo &EXMO, ifid &IFID, mowb &old_MOWB, pc &PC, int &alu_count, int &total_stalls, int &total_flushes, int &t1_forwards, int &t2_forwards)
+{
+    if (!IDEX.valid)
+    {
+        if (!EXMO.stall)
+            EXMO.valid = false;
+        return;
+    }
+    if (!EXMO.stall && load_use_hazard(IDEX, EXMO)) // stalling for only one cycle
+    {
+        if (IDEX.CW.jump == "00")
+        { // 0 - inp1; 1 - inp2
+            IDEX.rs1 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 0);
+            IDEX.rs2 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 1);
+        }
+        total_stalls++;
+        IDEX.stall = true;
+        EXMO.valid = false;
+        EXMO.stall = true;
+        return;
+    }
+
+    int ALU_inp1, ALU_inp2;
+    if (IDEX.CW.jump != "00")
+        ALU_inp1 = IDEX.instr_PC, ALU_inp2 = 4;
+    else
+    { // 0 - inp1; 1 - inp2
+        ALU_inp1 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 0);
+        ALU_inp2 = forwarder_ex(IDEX, EXMO, old_MOWB, t1_forwards, t2_forwards, 1);
+    }
+    ALU aluRes(IDEX.ALUsel, ALU_inp1, ALU_inp2);
+
+    int JPC, BPC;
+    // JPC and BPC computation
+    if (IDEX.CW.jump != "00")
+    {
+        PC.IA = JPC;
+        PC.valid = true;
+        IFID.valid = false;
+        IDEX.valid = false;
+        IFID.stall = false;
+        total_flushes++;
+    }
+    else if ((IDEX.CW.branch == "01" && aluRes.zeroFlag) || (IDEX.CW.branch == "10" && aluRes.LTflag))
+    {
+        PC.IA = BPC;
+        PC.valid = true;
+        IFID.valid = false;
+        IDEX.valid = false;
+        IFID.stall = false;
+        total_flushes++;
+    }
+    // EXMO writing
+    IDEX.stall = false;
+    EXMO.valid = true;
+}
+
+void memory_op(std::vector<int> &DM, exmo &EXMO, mowb &MOWB, mowb &old_MOWB, int &DM_write, int &DM_read, int &t3_forwards)
+{
+    if (MOWB.valid)
+        old_MOWB = MOWB;
+    if (!EXMO.valid)
+    {
+        if (!MOWB.stall)
+            MOWB.valid = false;
+        return;
+    }
+    if (MOWB.stall)
+    {
+        EXMO.stall = true;
+        return;
+    }
+    int mem_inp = forwarder_mo(EXMO, MOWB, t3_forwards);
+    // Mem op and MOWB write
+    EXMO.stall = false;
+    MOWB.valid = true;
+}
+
+void writeback(int regFile[], mowb &MOWB, int &reg_write_count, int &instr_count)
+{
+    if (!MOWB.valid)
+        return;
+    if (MOWB.stall)
+        return;
+    if (MOWB.CW.regWrite)
+    {
+        if (MOWB.CW.mem2Reg)
+            regFile[MOWB.rdl] = MOWB.LDres;
+        else
+            regFile[MOWB.rdl] = MOWB.ALUres;
+    }
+    MOWB.stall = false;
+    regFile[0] = 0;
+    instr_count++;
+}

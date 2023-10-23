@@ -14,12 +14,12 @@ The user can modify *ecall* and other auxiliary statements as per need.
 
 - A non-pipelined simulator written in C++ `simulator.cpp` that executes instructions encoded in binary format and writes back into a .txt file it uses as memory.
 
-- A simulator for a 5-stage pipeline with **interlocks** written in C++ `stall_pipeline.cpp` that executes instructions and also writes stage description and time for each cycle and also prints execution statistics like number of stalls and flushes.
+- A simulator for a 5-stage pipeline with **interlocks** written in C++ `stall_pipeline.cpp` that executes instructions and also writes stage description for each cycle and also prints execution statistics like number of stalls and flushes.
 
-- A simulator for a 5-stage pipeline with **operand forwarding** written in C++ `op_forward_stall_pipeline.cpp` that executes instructions and also writes stage description and time for each cycle and also prints execution statistics like number of forwards, stalls and flushes.<br>
+- A simulator for a 5-stage pipeline with **operand forwarding** written in C++ `op_forward_stall_pipeline.cpp` that executes instructions and also writes stage description for each cycle and also prints execution statistics like number of forwards, stalls and flushes.<br>
   NOTE: load-use hazards have also been taken care of.
 
-- P.S `pipelined_simulator.cpp` : Rudimentary pipeline (was too good to delete); Divides into stages but works on single instruction in a particular cycle and shows execution time
+- P.S `pipelined_simulator.cpp` : Rudimentary pipeline (was too good to delete); Divides into stages but works on single instruction in a particular cycle and shows number of machine-level instructions
 
 ## Assembler Description and Usage Guidelines :
 
@@ -160,6 +160,9 @@ Input : 9305 & 4300 ; Output : GCD = 5 & LCM = 8002300
 Not sure if I will make the GUI. Even if I don't, this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
 **Webpage** : https://luplab.gitlab.io/rvcodecjs/<br> 
 **Repository** : https://gitlab.com/luplab/rvcodecjs<br>
+
+**Pipeline** : https://webriscv.dii.unisi.it/
+https://vhosts.eecs.umich.edu/370simulators/pipeline/simulator.html
 
 *Though adding all references used is not possible yet the ones which have been most helpful while making this project have been highlighted in the References folder. A lot of inputs and ideas have been taken from these references.*
 <br><br>
