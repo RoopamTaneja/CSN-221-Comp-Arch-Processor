@@ -140,14 +140,11 @@ public:
         }
     }
 
-    cache_block replace(vector<int> &memResp, CPUreq &newRequest)
+    void replace(cache_block &block, vector<int> &memResp, CPUreq &newRequest)
     {
         // direct mapped
-        cache_block newBlock(block_size);
-        newBlock.tag = newRequest.tag;
-        newBlock.data_block = memResp;
-        cache_array[newRequest.index][0] = newBlock;
-        return newBlock;
+        block.tag = newRequest.tag;
+        block.data_block = memResp;
     }
 };
 
@@ -228,13 +225,14 @@ int main(int argc, char *argv[])
             misses++;
             cache.evict(block, newRequest, dirty_evict);
             vector<int> memResp = memRead(trace, block_size, cache.offset_mask);
-            block = cache.replace(memResp, newRequest);
+            cache.replace(block, memResp, newRequest);
             if (!newRequest.read_write) // read
             {
                 CPUresp = block.data_block[newRequest.offset];
                 // cout << "Miss - Loaded data : " << CPUresp << "\n";
                 block.valid_bit = 1;
                 block.dirty_bit = 0;
+                cache.cache_array[newRequest.index][0] = block;
                 reads++;
             }
             else // write
