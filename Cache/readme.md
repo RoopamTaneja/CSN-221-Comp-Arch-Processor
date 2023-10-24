@@ -30,7 +30,7 @@ For the second one, a line will be drawn; the Y-axis for the graph will be the m
 For the third one, a line will be drawn; the Y-axis for the graph will be the miss rate, and the X-axis for the graphs will be the associativity (given the fixed cache size 8192; fixed block size 32). For results, you will need to run your cache simulator for "go" for associativity of 1, 2, 4, 8, 16, 32, and the fully associative. 
 
 
-To support testing of your data cache simulator, you will implement a simple model of main memory. The capacity of the memory should be 4 MB (1 megaword). At simulator start-up time, initialize the contents of each word to be the word's address. For example, the 32-bit word that starts at byte 0x00001004 should be initialized to 0x00001004. 
+To support testing of your data cache simulator, you will implement a simple model of main memory. The capacity of the memory should be 1 MB (256 kilowords). At simulator start-up time, initialize the contents of each word to be the word's address. For example, the 32-bit word that starts at byte 0x00001004 should be initialized to 0x00001004. 
 
 At the end of the trace, write all dirty blocks to the memory, so that the memory contains updated data. However, do not count them in "Number of Dirty Blocks Evicted From the Cache", since they have not really been evicted from the cache.
 
