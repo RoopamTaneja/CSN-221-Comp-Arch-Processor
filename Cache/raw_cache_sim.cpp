@@ -2,6 +2,8 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
+#include <list>
 using std::cout, std::cin, std::string, std::vector;
 
 struct trace_data
@@ -78,21 +80,61 @@ public:
     }
 };
 
+class lru
+{
+    std::list<int> q;
+    std::unordered_map<int, std::list<int>::iterator> lookup_table;
+
+public:
+    void removeExistingElement(int ind)
+    {
+        if (lookup_table.find(ind) != lookup_table.end())
+        {
+            q.erase(lookup_table[ind]);
+            lookup_table.erase(ind);
+        }
+    }
+
+    void addMRUelement(int ind)
+    {
+        q.push_front(ind);
+        lookup_table[ind] = q.begin();
+    }
+
+    int removeLRUelement()
+    {
+        int evict_ind = q.back();
+        q.pop_back();
+        lookup_table.erase(evict_ind);
+        return evict_ind;
+    }
+
+    void printData()
+    {
+        for (auto it = q.begin(); it != q.end(); it++)
+            cout << *it << " ";
+        cout << "\n";
+    }
+};
+
 class Cache
 {
 public:
     vector<vector<cache_block>> cache_array;
+    vector<lru> lru_array;
     int cache_size;
     int block_size;
     int offset_size;
     long long offset_mask;
     int block_num;
     int set_num;
+    int ways;
     int index_size;
     long long index_mask;
 
     Cache(int cache_sz, int ways, int block_sz)
     {
+        this->ways = ways;
         cache_size = cache_sz * 256; // KB -> no of words
         block_size = block_sz / 4;   // bytes -> no of words
         offset_size = std::__lg(block_size);
@@ -102,20 +144,43 @@ public:
         index_size = std::__lg(set_num);
         index_mask = (1 << index_size) - 1;
         cache_array.assign(set_num, vector<cache_block>(ways, cache_block(block_size)));
+        lru_array.resize(set_num);
     }
 
-    void evict(cache_block &block, int &dirty_evict)
+    void hitUpdate(CPUreq &newRequest, int ind)
     {
-        if (!block.valid_bit) // do nothing for invalid block
-            return;
-        if (block.valid_bit && block.dirty_bit) // dirty block
+        lru &lru_queue = lru_array[newRequest.index];
+        lru_queue.removeExistingElement(ind);
+        lru_queue.addMRUelement(ind);
+    }
+
+    int insert(CPUreq &newRequest)
+    {
+        vector<cache_block> &set = cache_array[newRequest.index];
+        lru &lru_queue = lru_array[newRequest.index];
+        for (int i = 0; i < ways; i++)
+        {
+            if (!set[i].valid_bit)
+            {
+                lru_queue.addMRUelement(i);
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    int replace(CPUreq &newRequest)
+    {
+        lru &lru_queue = lru_array[newRequest.index];
+        int evict_ind = lru_queue.removeLRUelement();
+        lru_queue.addMRUelement(evict_ind);
+        return evict_ind;
+    }
+
+    void evict(cache_block &evict_block, CPUreq &newRequest, int &dirty_evict)
+    {
+        if (evict_block.valid_bit && evict_block.dirty_bit)
             dirty_evict++;
-    }
-
-    void replace(cache_block &block, CPUreq &newRequest)
-    {
-        // direct mapped
-        block.tag = newRequest.tag;
     }
 };
 
@@ -167,43 +232,58 @@ int main(int argc, char *argv[])
     {
         CPUreq newRequest(trace, cache.offset_size, cache.offset_mask, cache.index_size, cache.index_mask);
         int CPUresp;
-        cache_block block = cache.cache_array[newRequest.index][0];
-        if (block.tag == newRequest.tag) // hit
+        bool miss = true;
+        vector<cache_block> &set = cache.cache_array[newRequest.index];
+        for (int i = 0; i < cache.ways; i++)
         {
-            hits++;
-            if (!newRequest.read_write) // read
+            cache_block &block = set[i];
+            if (block.tag == newRequest.tag) // hit
             {
-                // CPUresp = block.data_block[newRequest.offset];
-                reads++;
-            }
-            else
-            { // write
-                // block.data_block[newRequest.offset] = newRequest.data;
-                block.valid_bit = 1;
-                block.dirty_bit = 1;
-                cache.cache_array[newRequest.index][0] = block;
-                writes++;
+                hits++;
+                miss = false;
+                cache.hitUpdate(newRequest, i);
+                if (!newRequest.read_write) // read
+                {
+                    // CPUresp = block.data_block[newRequest.offset];
+                    reads++;
+                }
+                else // write
+                {
+                    // block.data_block[newRequest.offset] = newRequest.data;
+                    block.valid_bit = 1;
+                    block.dirty_bit = 1;
+                    writes++;
+                }
+                break;
             }
         }
-        else // miss
+        if (miss) // miss
         {
             misses++;
-            cache.evict(block, dirty_evict);
-            cache.replace(block, newRequest);
+            cache_block newBlock(cache.block_size);
+            newBlock.tag = newRequest.tag;
+            int insertion_ind = cache.insert(newRequest);
+            if (insertion_ind == -1)
+            {
+                int evict_ind = cache.replace(newRequest);
+                cache_block evict_block = set[evict_ind];
+                cache.evict(evict_block, newRequest, dirty_evict);
+                insertion_ind = evict_ind;
+            }
             if (!newRequest.read_write) // read
             {
-                // CPUresp = block.data_block[newRequest.offset];
-                block.valid_bit = 1;
-                block.dirty_bit = 0;
-                cache.cache_array[newRequest.index][0] = block;
+                // CPUresp = newBlock.data_block[newRequest.offset];
+                newBlock.valid_bit = 1;
+                newBlock.dirty_bit = 0;
+                set[insertion_ind] = newBlock;
                 reads++;
             }
             else // write
             {
-                // block.data_block[newRequest.offset] = newRequest.data;
-                block.valid_bit = 1;
-                block.dirty_bit = 1;
-                cache.cache_array[newRequest.index][0] = block;
+                // newBlock.data_block[newRequest.offset] = newRequest.data;
+                newBlock.valid_bit = 1;
+                newBlock.dirty_bit = 1;
+                set[insertion_ind] = newBlock;
                 writes++;
             }
         }
