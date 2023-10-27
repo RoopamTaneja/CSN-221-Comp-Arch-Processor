@@ -1,3 +1,0 @@
-Cache Size(in KB) : 8
-Associativity(1/2/4/8/16) : 1
-Block Size(in bytes) : 64

@@ -1,6 +1,6 @@
 # CSN-221 Course Project
 
-This project was made as part of course CSN-221 : Computer Architecture and Microprocessors in Autumn Semester 2023-24.<br>The project statement is in the References folder.<br>
+This project was made as part of course CSN-221 : Computer Architecture and Microprocessors in Autumn Semester 2023-24.<br>The project statement and references are in the References folder.<br>
 
 ## Contents :
 - Three sample programs written in RISC-V assembly language :<br>
