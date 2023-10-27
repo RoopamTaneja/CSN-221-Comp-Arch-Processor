@@ -161,7 +161,8 @@ Not sure if I will make the GUI. Even if I don't, this interactive webpage helpe
 **Webpage** : https://luplab.gitlab.io/rvcodecjs/<br> 
 **Repository** : https://gitlab.com/luplab/rvcodecjs<br>
 
-**Pipeline** : https://webriscv.dii.unisi.it/
+**Some Existing Pipeline GUIs** : <br>
+https://webriscv.dii.unisi.it/<br>
 https://vhosts.eecs.umich.edu/370simulators/pipeline/simulator.html
 
 *Though adding all references used is not possible yet the ones which have been most helpful while making this project have been highlighted in the References folder. A lot of inputs and ideas have been taken from these references.*
