@@ -157,13 +157,16 @@ Input : 9305 & 4300 ; Output : GCD = 5 & LCM = 8002300
 | With operand forwarding | NA                      | 21488 (2)                       | 4297                         | 47273        | 38673 | 8596  | 1.22238   |
 
 ### GUI :
-Not sure if I will make the GUI. Even if I don't, this interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
+This interactive webpage helped me a lot with instruction encoding. Do have a look.<br>
 **Webpage** : https://luplab.gitlab.io/rvcodecjs/<br> 
 **Repository** : https://gitlab.com/luplab/rvcodecjs<br>
 
-**Some Existing Pipeline GUIs** : <br>
+**Some Existing Pipeline & Cache GUIs** : <br>
 https://webriscv.dii.unisi.it/<br>
-https://vhosts.eecs.umich.edu/370simulators/pipeline/simulator.html
+https://vhosts.eecs.umich.edu/370simulators/pipeline/simulator.html<br>
+https://ripes.me/
+https://www3.ntu.edu.sg/home/smitha/ParaCache/Paracache/start.html
+https://rivoire.cs.sonoma.edu/cs351/cachesim/
 
 *Though adding all references used is not possible yet the ones which have been most helpful while making this project have been highlighted in the References folder. A lot of inputs and ideas have been taken from these references.*
 <br><br>

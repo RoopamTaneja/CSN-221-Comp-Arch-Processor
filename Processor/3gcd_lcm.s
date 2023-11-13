@@ -9,7 +9,7 @@ load_val:
     lw a4, 0x00000000(zero)
     lw a5, 0x00000004(zero) 
 
-find_min: # a6 = min(a4,a5)
+find_min: # a6 = min(a4, a5)
     blt a4, a5, load_other
     addi a6, a5, 0
     jal zero, loop_gcd
@@ -20,8 +20,8 @@ load_other:
 loop_gcd:
     li a3, 1
     blt a6, a3, exit # while (a6>0)
-    rem a0, a4, a6 # a0 = a4%a6
-    rem a1, a5, a6 # a1 = a5%a6
+    rem a0, a4, a6 # a0 = a4 % a6
+    rem a1, a5, a6 # a1 = a5 % a6
     or a2, a0, a1 # a0 or a1 == 0 only iff both rem == 0
     beq a2, zero, store_n_print_gcd # in that case it's our gcd
     addi a6, a6, -1 # a6--
@@ -36,7 +36,7 @@ store_n_print_gcd:
 
 lcm:
     lw a6, 0x00000008(zero) # load gcd
-    # lcm = (a*b)/gcd
+    # lcm = (a * b) / gcd
     div a7, a4, a6
     mul a7, a7, a5
 
