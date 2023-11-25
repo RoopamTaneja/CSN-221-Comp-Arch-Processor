@@ -1,8 +1,8 @@
-# CSN-221 Course Project
+# CSN-221 Course Project - Processor
 
 This project was made as part of course CSN-221 : Computer Architecture and Microprocessors in Autumn Semester 2023-24.<br>The project statement and references are in the References folder.<br>
 
-## Contents :
+## Contents of Processor Folder:
 - Three sample programs written in RISC-V assembly language :<br>
 &emsp;> `1prime.s` : Check if a number stored in memory is prime or not.<br>
 &emsp;> `2factorial.s` : Calculate factorial of a number stored in memory.<br>
@@ -164,9 +164,9 @@ This interactive webpage helped me a lot with instruction encoding. Do have a lo
 **Some Existing Pipeline & Cache GUIs** : <br>
 https://webriscv.dii.unisi.it/<br>
 https://vhosts.eecs.umich.edu/370simulators/pipeline/simulator.html<br>
-https://ripes.me/
-https://www3.ntu.edu.sg/home/smitha/ParaCache/Paracache/start.html
-https://rivoire.cs.sonoma.edu/cs351/cachesim/
+https://ripes.me/<br>
+https://www3.ntu.edu.sg/home/smitha/ParaCache/Paracache/start.html<br>
+https://rivoire.cs.sonoma.edu/cs351/cachesim/<br>
 
 *Though adding all references used is not possible yet the ones which have been most helpful while making this project have been highlighted in the References folder. A lot of inputs and ideas have been taken from these references.*
 <br><br>

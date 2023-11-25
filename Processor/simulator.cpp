@@ -127,7 +127,8 @@ int immGen(const string instr, string immSel)
     else if (immSel == "011") // b-type imm
     {
         string offset = "";
-        offset += instr[0] + instr[24];
+        offset += instr[0];
+        offset += instr[24];
         offset += instr.substr(1, 6) + instr.substr(20, 4);
         imm = dec_sign_imm(offset);
         imm <<= 1;
